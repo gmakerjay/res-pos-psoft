@@ -89,7 +89,7 @@ Environment=ASPNETCORE_URLS=http://0.0.0.0:3000
 WantedBy=multi-user.target
 """
 
-create_svc_cmd = f"cat << 'EOF' > /etc/systemd/system/restaurantpos.service\n{service_content}\nEOF\nsystemctl daemon-reload && systemctl enable --now restaurantpos"
+create_svc_cmd = f"cat << 'EOF' > /etc/systemd/system/restaurantpos.service\n{service_content}\nEOF\nsystemctl daemon-reload && systemctl enable restaurantpos && systemctl restart restaurantpos"
 out, err = run_ssh(create_svc_cmd, use_sudo=True)
 print("Service install output:\n", out)
 
