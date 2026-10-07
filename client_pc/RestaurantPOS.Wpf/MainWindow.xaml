@@ -1,0 +1,1080 @@
+<Window x:Class="RestaurantPOS.Wpf.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ระบบร้านอาหาร Restaurant POS System (Windows Desktop Edition) - v1.0.0" 
+        Height="860" Width="1440"
+        MinHeight="760" MinWidth="1280"
+        WindowStartupLocation="CenterScreen"
+        Background="#ECE9D8"
+        FontFamily="Segoe UI, Tahoma"
+        FontSize="15">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="54"/>   <!-- 0: Top App Header -->
+            <RowDefinition Height="Auto"/> <!-- 1: Live Order Alert Banner -->
+            <RowDefinition Height="46"/>   <!-- 2: Main Navigation Tabs -->
+            <RowDefinition Height="*"/>    <!-- 3: Main Content Area -->
+            <RowDefinition Height="30"/>   <!-- 4: Bottom Status Bar -->
+        </Grid.RowDefinitions>
+
+        <!-- 0. Top App Header (Classic XP Theme with High Visibility) -->
+        <Border Grid.Row="0" Background="#245EDC" BorderBrush="#163E9B" BorderThickness="0,0,0,2">
+            <DockPanel Margin="16,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#1C4BB3" Padding="10,5" CornerRadius="4" Margin="0,0,14,0">
+                        <TextBlock Text="RESTAURANT POS" FontWeight="Bold" FontSize="17" Foreground="White"/>
+                    </Border>
+                    <Border Background="#0D47A1" Padding="8,4" CornerRadius="4" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtStoreBadge" Text="[ร้าน: DEFAULT]" FontWeight="Bold" FontSize="13" Foreground="#FFEB3B" VerticalAlignment="Center"/>
+                    </Border>
+                    <!-- License Status Badge (Clickable to open Activate License Dialog) -->
+                    <Border x:Name="BorderLicenseBadge" Background="#E65100" Padding="8,4" CornerRadius="4" VerticalAlignment="Center" Margin="8,0,0,0" Cursor="Hand" MouseDown="BorderLicenseBadge_MouseDown">
+                        <TextBlock x:Name="TxtLicenseBadge" Text="[ สิทธิ์: กำลังตรวจสอบ... ]" FontWeight="Bold" FontSize="12.5" Foreground="White" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="|" Foreground="#7FA5EB" Margin="12,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TxtCashier" Text="ผู้ใช้งาน: admin [SuperAdmin]" FontSize="14" FontWeight="SemiBold" Foreground="#E0EDFF" VerticalAlignment="Center"/>
+                    <Button x:Name="BtnLogout" Content="ออกจากระบบ" Height="30" Padding="12,2" Margin="14,0,0,0"
+                            Background="#D32F2F" Foreground="White" BorderBrush="#B71C1C" FontSize="13" FontWeight="Bold"
+                            Click="BtnLogout_Click" Cursor="Hand"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <!-- Server Config Button -->
+                    <Button x:Name="BtnServerConfig" Content="ตั้งค่าเซิร์ฟเวอร์..." Height="32" Padding="14,2"
+                            Background="#316AC5" Foreground="White" BorderBrush="#1C4BB3" FontWeight="Bold" FontSize="13"
+                            Margin="0,0,14,0" Click="BtnServerConfig_Click" Cursor="Hand"/>
+
+                    <!-- Realtime Connection Status Badge -->
+                    <Border x:Name="BadgeConnection" Background="#2E7D32" CornerRadius="12" Padding="12,5" Margin="0,0,16,0">
+                        <TextBlock x:Name="TxtConnection" Text="เชื่อมต่อเซิร์ฟเวอร์เรียบร้อย" FontSize="12.5" FontWeight="Bold" Foreground="White"/>
+                    </Border>
+
+                    <!-- Clock -->
+                    <TextBlock x:Name="TxtClock" Text="2026-10-07 14:00:00" FontFamily="Consolas" FontSize="15" 
+                               FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- 1. Live Order Alert Banner (Shows when customer orders online) -->
+        <Border x:Name="BorderAlert" Grid.Row="1" Background="#EF6C00" BorderBrush="#E65100" BorderThickness="0,0,0,1" 
+                Padding="16,8" Visibility="Collapsed">
+            <DockPanel LastChildFill="True">
+                <Button Content="ดูรายการออเดอร์ (F2)" DockPanel.Dock="Right" Height="30" Padding="16,2" 
+                        Background="#FFF" Foreground="#E65100" BorderBrush="#B23C00" FontWeight="Bold" FontSize="13"
+                        Click="BtnAlertViewOrders_Click" Cursor="Hand"/>
+                <Button Content="[X] ปิดแจ้งเตือน" DockPanel.Dock="Right" Height="30" Padding="10,2" Margin="0,0,10,0"
+                        Background="#D84315" Foreground="White" BorderBrush="#BF360C" FontSize="12" FontWeight="Bold"
+                        Click="BtnAlertDismiss_Click" Cursor="Hand"/>
+                <TextBlock x:Name="TxtAlertMessage" Text="[มีออเดอร์ใหม่จากลูกค้า] กำลังรอคิว..." 
+                           VerticalAlignment="Center" FontWeight="Bold" Foreground="White" FontSize="14.5"/>
+            </DockPanel>
+        </Border>
+
+        <!-- 2. Main Navigation Tabs (Large Touch-Friendly Font) -->
+        <Border Grid.Row="2" Background="#D8D4C8" BorderBrush="#9E9A8E" BorderThickness="0,0,0,1" Padding="12,3,12,0">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                    <RadioButton x:Name="TabPos" Content=" [ F1 ] หน้าขายแคชเชียร์ (POS) " IsChecked="True" 
+                                 Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
+                    <RadioButton x:Name="TabOrders" Content=" [ F2 ] ออเดอร์ลูกค้า &amp; ห้องครัว " 
+                                 Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
+                    <RadioButton x:Name="TabMenu" Content=" [ F3 ] จัดการรายการอาหาร &amp; หมวดหมู่ " 
+                                 Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
+                    <RadioButton x:Name="TabStock" Content=" [ F4 ] สต๊อกวัตถุดิบ (Raw Materials) " 
+                                 Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
+                    <RadioButton x:Name="TabReports" Content=" [ F5 ] สรุปรายงานยอดขาย " 
+                                 Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
+                    <RadioButton x:Name="TabSettings" Content=" [ F6 ] ตั้งค่าระบบ &amp; เสียงเตือน " 
+                                 Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
+                </StackPanel>
+                
+                <Button x:Name="BtnActivateLicense" DockPanel.Dock="Right" 
+                        Content="[ เปิดใช้งานสิทธิ์ Key ]" 
+                        Padding="10,4" Margin="0,0,8,3" Height="28"
+                        Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20"
+                        FontWeight="Bold" FontSize="11.5" Cursor="Hand"
+                        Click="BtnActivateLicense_Click"/>
+
+                <Button x:Name="BtnOpenTableQr" DockPanel.Dock="Right" 
+                        Content="[ จัดการ &amp; พิมพ์ QR Code โต๊ะ ]" 
+                        Padding="12,4" Margin="0,0,0,3" Height="28"
+                        Background="#0D47A1" Foreground="White" BorderBrush="#002171"
+                        FontWeight="Bold" FontSize="11.5" Cursor="Hand"
+                        Click="BtnOpenTableQr_Click"/>
+            </DockPanel>
+        </Border>
+
+
+        <!-- 3. Main Content Area -->
+        <Grid Grid.Row="3" Margin="10">
+
+            <!-- TAB 1: POS SALES (Decoupled from Tables - No Table Locking!) -->
+            <Grid x:Name="ViewPos" Visibility="Visible">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>   <!-- Product Menu & Category Filter -->
+                    <ColumnDefinition Width="480"/> <!-- Current Order Tray / Cart -->
+                </Grid.ColumnDefinitions>
+
+                <!-- LEFT/CENTER: Product Catalog -->
+                <Border Grid.Column="0" Background="White" BorderBrush="#7F9DB9" BorderThickness="1" Margin="0,0,10,0">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- Category Tabs & Search -->
+                            <RowDefinition Height="*"/>    <!-- Product Cards Grid -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Top Filter Bar: Category Tabs & Search -->
+                        <Grid Grid.Row="0" Margin="0,0,0,10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,8">
+                                <StackPanel x:Name="PanelCategoryTabs" Orientation="Horizontal"/>
+                            </ScrollViewer>
+
+                            <!-- Search Menu Box -->
+                            <DockPanel Grid.Row="1">
+                                <TextBlock Text="ค้นหาเมนูอาหาร:" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="14" Margin="0,0,8,0"/>
+                                <TextBox x:Name="TxtSearchProduct" Height="36" FontSize="14" Padding="8,4" VerticalContentAlignment="Center"
+                                         TextChanged="TxtSearchProduct_TextChanged"/>
+                            </DockPanel>
+                        </Grid>
+
+                        <!-- Product Cards Grid -->
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="ListProducts">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Width="180" Height="185" Margin="5" Background="#FAFAFA" BorderBrush="#B0C4DE" 
+                                                BorderThickness="1.5" Click="ProductButton_Click" Tag="{Binding Id}"
+                                                Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Cursor="Hand">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="95"/>
+                                                    <RowDefinition Height="*"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+
+                                                <!-- Product Image -->
+                                                <Border Grid.Row="0" Background="#ECEFF1" ClipToBounds="True">
+                                                    <Grid>
+                                                        <Image Source="{Binding ImageUrl}" Stretch="UniformToFill"/>
+                                                        <!-- Sold out badge overlay -->
+                                                        <Border Background="#D0B71C1C" VerticalAlignment="Center" HorizontalAlignment="Stretch" Padding="4">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsAvailable}" Value="False">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <StackPanel>
+                                                                <TextBlock Text="[ หมด ]" Foreground="White" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding OutOfStockReason}" Foreground="#FFF9C4" FontSize="10" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+
+                                                <!-- Product Code & Name -->
+                                                <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="6,3">
+                                                    <TextBlock Text="{Binding Code}" FontSize="11" Foreground="#757575" HorizontalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14.5" 
+                                                               TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center" Foreground="#212121"/>
+                                                </StackPanel>
+
+                                                <!-- Price & Status Badge -->
+                                                <Border Grid.Row="2" Background="#E3F2FD" CornerRadius="3" Padding="6,3" Margin="6,0,6,6">
+                                                    <DockPanel LastChildFill="True">
+                                                        <TextBlock Text="{Binding Price, StringFormat='{}{0:N2} บ.'}" FontWeight="Bold" FontSize="14.5" Foreground="#1565C0" HorizontalAlignment="Center"/>
+                                                    </DockPanel>
+                                                </Border>
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <!-- RIGHT: Current Order Cart Tray (Spacious, Large Font, No Table Locking) -->
+                <Border Grid.Column="1" Background="White" BorderBrush="#7F9DB9" BorderThickness="1">
+                    <Grid Margin="12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- 0: Order Reference Header -->
+                            <RowDefinition Height="Auto"/> <!-- 1: Existing Table Orders Panel (Dynamic) -->
+                            <RowDefinition Height="*"/>    <!-- 2: Cart Items Grid (New items to add/order) -->
+                            <RowDefinition Height="Auto"/> <!-- 3: Cart Totals Summary -->
+                            <RowDefinition Height="Auto"/> <!-- 4: Action Buttons -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Order Reference Header Box -->
+                        <Border Grid.Row="0" Background="#F1F5F9" BorderBrush="#CBD5E1" BorderThickness="1" Padding="10" Margin="0,0,0,8" CornerRadius="4">
+                            <StackPanel>
+                                <!-- Order Type Selector -->
+                                <UniformGrid Columns="3" Margin="0,0,0,8" Height="36">
+                                    <RadioButton x:Name="RbDineIn" Content="ทานที่ร้าน" IsChecked="True" Style="{DynamicResource SmallTabRadioStyle}" Checked="OrderType_Changed"/>
+                                    <RadioButton x:Name="RbTakeAway" Content="สั่งกลับบ้าน" Style="{DynamicResource SmallTabRadioStyle}" Checked="OrderType_Changed"/>
+                                    <RadioButton x:Name="RbDelivery" Content="เดลิเวอรี" Style="{DynamicResource SmallTabRadioStyle}" Checked="OrderType_Changed"/>
+                                </UniformGrid>
+
+                                <!-- Table / Customer Ref (Non-blocking text box) -->
+                                <DockPanel Margin="0,0,0,6">
+                                    <TextBlock Text="เบอร์โต๊ะ / ชื่อลูกค้า:" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <Button Content="ล้าง" Height="28" Padding="10,0" Background="#EEEEEE" BorderBrush="#CCC" 
+                                            FontSize="12" DockPanel.Dock="Right" Click="BtnClearTableRef_Click"/>
+                                    <TextBox x:Name="TxtTableRef" Text="โต๊ะ 1" Height="38" FontSize="16" FontWeight="Bold" 
+                                             Padding="8,4" VerticalContentAlignment="Center" Background="#FFF" TextChanged="TxtTableRef_TextChanged"/>
+                                </DockPanel>
+
+                                <!-- Quick Table Shortcuts with Hover & Occupied Badges -->
+                                <WrapPanel x:Name="PanelQuickTables" Margin="0,4,0,0">
+                                    <Button x:Name="BtnQuickT1" Content="T1" Width="44" Height="32" Margin="2" Style="{DynamicResource PosTableButtonStyle}" Click="QuickTable_Click" Tag="โต๊ะ 1"/>
+                                    <Button x:Name="BtnQuickT2" Content="T2" Width="44" Height="32" Margin="2" Style="{DynamicResource PosTableButtonStyle}" Click="QuickTable_Click" Tag="โต๊ะ 2"/>
+                                    <Button x:Name="BtnQuickT3" Content="T3" Width="44" Height="32" Margin="2" Style="{DynamicResource PosTableButtonStyle}" Click="QuickTable_Click" Tag="โต๊ะ 3"/>
+                                    <Button x:Name="BtnQuickT4" Content="T4" Width="44" Height="32" Margin="2" Style="{DynamicResource PosTableButtonStyle}" Click="QuickTable_Click" Tag="โต๊ะ 4"/>
+                                    <Button x:Name="BtnQuickT5" Content="T5" Width="44" Height="32" Margin="2" Style="{DynamicResource PosTableButtonStyle}" Click="QuickTable_Click" Tag="โต๊ะ 5"/>
+                                    <Button x:Name="BtnQuickT6" Content="T6" Width="44" Height="32" Margin="2" Style="{DynamicResource PosTableButtonStyle}" Click="QuickTable_Click" Tag="โต๊ะ 6"/>
+                                    <Button x:Name="BtnQuickT7" Content="T7" Width="44" Height="32" Margin="2" Style="{DynamicResource PosTableButtonStyle}" Click="QuickTable_Click" Tag="โต๊ะ 7"/>
+                                    <Button x:Name="BtnQuickT8" Content="T8" Width="44" Height="32" Margin="2" Style="{DynamicResource PosTableButtonStyle}" Click="QuickTable_Click" Tag="โต๊ะ 8"/>
+                                    <Button x:Name="BtnQuickTakeAway" Content="กลับบ้าน" Height="32" Padding="8,0" Margin="2" Style="{DynamicResource PosTableButtonStyle}" Click="QuickTable_Click" Tag="สั่งกลับบ้าน"/>
+                                    <Button Content="[ QR โต๊ะ ]" Height="32" Padding="6,0" Margin="2" Background="#0D47A1" Foreground="White" BorderBrush="#002171" FontWeight="Bold" FontSize="11" Click="BtnOpenTableQr_Click" ToolTip="จัดการและพิมพ์ป้าย QR Code ติดโต๊ะอาหาร" Cursor="Hand"/>
+                                </WrapPanel>
+
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Existing Table Orders Summary Card (Shows when table has active orders) -->
+                        <Border x:Name="BorderTableActiveOrders" Grid.Row="1" Background="#FEFCE8" BorderBrush="#FDE047" BorderThickness="1.5" 
+                                CornerRadius="4" Padding="10" Margin="0,0,0,8" Visibility="Collapsed">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Status Header -->
+                                <DockPanel Grid.Row="0" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock x:Name="TxtTableStatusBadge" Text="[มีออเดอร์ค้าง]" FontWeight="Bold" FontSize="13" Foreground="#B45309" Margin="0,0,8,0"/>
+                                        <TextBlock x:Name="TxtTableExistingCount" Text="1 บิล (3 รายการ)" FontSize="12.5" Foreground="#64748B" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock Text="ยอดรวมเดิม: " FontSize="12.5" Foreground="#64748B"/>
+                                        <TextBlock x:Name="TxtTableExistingTotal" Text="0.00 บ." FontSize="14.5" FontWeight="Bold" Foreground="#B45309"/>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <!-- Existing Items List (Scrollable, max 130px) -->
+                                <ScrollViewer Grid.Row="1" MaxHeight="130" VerticalScrollBarVisibility="Auto" Margin="0,0,0,6">
+                                    <ItemsControl x:Name="ListTableExistingItems">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="#FEF08A" BorderThickness="0,0,0,1" Padding="0,3">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{Binding StatusBadge}" FontWeight="Bold" FontSize="11" Foreground="#475569" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <TextBlock FontSize="12.5" FontWeight="SemiBold" Foreground="#1E293B">
+                                                                <Run Text="{Binding ProductName}"/>
+                                                                <Run Text=" x" Foreground="#2563EB" FontWeight="Bold"/>
+                                                                <Run Text="{Binding Quantity}" Foreground="#2563EB" FontWeight="Bold"/>
+                                                            </TextBlock>
+                                                            <TextBlock Text="{Binding OptionsAndNotesDisplay}" FontSize="11" Foreground="#64748B" TextTrimming="CharacterEllipsis"/>
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="2" Text="{Binding Subtotal, StringFormat='{}{0:N2} บ.'}" FontWeight="Bold" FontSize="12" Foreground="#334155" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+
+                                <!-- Direct Table Action Buttons -->
+                                <UniformGrid Grid.Row="2" Columns="2" Margin="0,4,0,0">
+                                    <Button x:Name="BtnViewTableOrdersPopup" Content="ดูรายละเอียดบิล (Popup)" Height="30" Margin="0,0,4,0"
+                                            Background="#FEF3C7" BorderBrush="#F59E0B" Foreground="#92400E" FontWeight="SemiBold" FontSize="12.5"
+                                            Click="BtnViewTableOrdersPopup_Click" Cursor="Hand"/>
+                                    <Button x:Name="BtnPayTableDirect" Content="เช็คบิลปิดโต๊ะนี้ (F10)" Height="30" Margin="4,0,0,0"
+                                            Background="#15803D" BorderBrush="#166534" Foreground="White" FontWeight="Bold" FontSize="12.5"
+                                            Click="BtnPayTableDirect_Click" Cursor="Hand"/>
+                                </UniformGrid>
+                            </Grid>
+                        </Border>
+
+                        <!-- Cart Items Grid (Large Font - Items to add) -->
+                        <DataGrid Grid.Row="2" x:Name="GridCartItems" AutoGenerateColumns="False" CanUserAddRows="False"
+                                  BorderBrush="#DCDCDC" GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                                  FontSize="14.5" RowHeight="42">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="รายการอาหาร" Binding="{Binding ProductName}" Width="*" FontWeight="SemiBold" IsReadOnly="True"/>
+                                <DataGridTemplateColumn Header="จำนวน" Width="110">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                <Button Content="-" Width="28" Height="28" FontWeight="Bold" FontSize="16" Click="BtnQtyMinus_Click" Tag="{Binding ProductId}" Cursor="Hand"/>
+                                                <TextBlock Text="{Binding Quantity}" Width="32" TextAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="15"/>
+                                                <Button Content="+" Width="28" Height="28" FontWeight="Bold" FontSize="16" Click="BtnQtyPlus_Click" Tag="{Binding ProductId}" Cursor="Hand"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="รวม (บ.)" Binding="{Binding Subtotal, StringFormat='{}{0:N2}'}" Width="95" FontWeight="Bold" IsReadOnly="True"/>
+                                <DataGridTemplateColumn Header="ลบ" Width="45">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="X" Width="26" Height="26" Foreground="#D32F2F" FontWeight="Bold" 
+                                                    Click="BtnRemoveCartItem_Click" Tag="{Binding ProductId}" Cursor="Hand"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Cart Totals Summary -->
+                        <Border Grid.Row="3" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" Padding="12" Margin="0,8,0,8" CornerRadius="4">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,4">
+                                    <TextBlock Text="ยอดรวมค่าอาหาร:" FontSize="14" Foreground="#64748B"/>
+                                    <TextBlock x:Name="TxtCartSubtotal" Text="0.00 บาท" FontSize="14.5" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                </DockPanel>
+                                <DockPanel Margin="0,0,0,4">
+                                    <TextBlock Text="ส่วนลด:" FontSize="14" Foreground="#64748B"/>
+                                    <TextBlock x:Name="TxtCartDiscount" Text="0.00 บาท" FontSize="14.5" Foreground="#C62828" HorizontalAlignment="Right"/>
+                                </DockPanel>
+                                <Separator Margin="0,4,0,8"/>
+                                <DockPanel>
+                                    <TextBlock Text="ยอดสุทธิ (Total):" FontSize="16" FontWeight="Bold" Foreground="#1E3A8A" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtCartTotal" Text="0.00 บาท" FontSize="26" FontWeight="Bold" Foreground="#DC2626" HorizontalAlignment="Right"/>
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Action Buttons -->
+                        <Grid Grid.Row="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="46"/>
+                                <RowDefinition Height="52"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Send to Kitchen -->
+                            <Button x:Name="BtnSendKitchen" Grid.Row="0" Grid.Column="0" Content="ส่งเข้าครัว (Send)" 
+                                    Margin="0,0,4,6" Background="#1D4ED8" Foreground="White" BorderBrush="#1E40AF" 
+                                    FontWeight="Bold" FontSize="14" Click="BtnSendKitchen_Click" Cursor="Hand"/>
+
+                            <!-- Clear Cart / Print Bill Preview -->
+                            <Button x:Name="BtnClearCart" Grid.Row="0" Grid.Column="1" Content="ล้างรายการบิล" 
+                                    Margin="4,0,0,6" Background="#F1F5F9" BorderBrush="#CBD5E1" 
+                                    FontWeight="SemiBold" FontSize="14" Foreground="#475569" Click="BtnClearCart_Click" Cursor="Hand"/>
+
+                            <!-- Pay & Checkout -->
+                            <Button x:Name="BtnPay" Grid.Row="1" Grid.ColumnSpan="2" Content="ชำระเงินและปิดบิล (F10)" 
+                                    Background="#15803D" Foreground="White" BorderBrush="#166534" 
+                                    FontWeight="Bold" FontSize="18" Click="BtnPay_Click" Cursor="Hand"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- TAB 2: REALTIME ORDERS & KITCHEN (KDS) -->
+            <Grid x:Name="ViewOrders" Visibility="Collapsed">
+                <Border Background="White" BorderBrush="#7F9DB9" BorderThickness="1" Padding="14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header Controls -->
+                        <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                            <TextBlock Text="รายการออเดอร์แบบ Real-time (Customer Web &amp; POS)" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="รีเฟรชรายการ" Height="34" Padding="16,2" Background="#F0F0F0" BorderBrush="#7F9DB9" FontWeight="SemiBold" FontSize="13.5" Click="BtnRefreshOrders_Click" Cursor="Hand"/>
+                            </StackPanel>
+                        </DockPanel>
+
+                        <!-- Orders Grid -->
+                        <DataGrid Grid.Row="1" x:Name="GridLiveOrders" AutoGenerateColumns="False" CanUserAddRows="False"
+                                  BorderBrush="#DCDCDC" GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                                  FontSize="14" RowHeight="40" SelectionMode="Single" MouseDoubleClick="GridLiveOrders_MouseDoubleClick">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="เลขที่บิล" Binding="{Binding OrderNumber}" Width="160" FontWeight="Bold"/>
+                                <DataGridTextColumn Header="โต๊ะ / อ้างอิง" Binding="{Binding TableDisplay}" Width="120" FontWeight="SemiBold"/>
+                                <DataGridTextColumn Header="ลูกค้า / เบอร์โทร" Binding="{Binding CustomerDisplay}" Width="170" FontWeight="SemiBold" Foreground="#1E3A8A"/>
+                                <DataGridTextColumn Header="เวลาที่สั่ง" Binding="{Binding CreatedAt, StringFormat='{}{0:HH:mm:ss}'}" Width="95"/>
+                                <DataGridTextColumn Header="สถานะ" Binding="{Binding StatusBadge}" Width="115" FontWeight="SemiBold"/>
+                                <DataGridTextColumn Header="จำนวนเงิน" Binding="{Binding TotalAmount, StringFormat='{}{0:N2} บ.'}" Width="110" FontWeight="Bold"/>
+                                <DataGridTemplateColumn Header="การดำเนินการ" Width="*">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Content="ดูรายละเอียด" Height="28" Padding="10,2" Margin="3,0" Background="#0284C7" Foreground="White" BorderBrush="#0369A1" 
+                                                        Click="BtnOrderDetails_Click" Tag="{Binding Id}" Cursor="Hand" FontWeight="Bold"/>
+                                                <Button Content="รับออเดอร์" Height="28" Padding="10,2" Margin="3,0" Background="#1D4ED8" Foreground="White" BorderBrush="#1E40AF" 
+                                                        Click="BtnOrderAccept_Click" Tag="{Binding Id}" Cursor="Hand" FontWeight="Bold"/>
+                                                <Button Content="ปรุงเสร็จ" Height="28" Padding="10,2" Margin="3,0" Background="#EA580C" Foreground="White" BorderBrush="#C2410C" 
+                                                        Click="BtnOrderReady_Click" Tag="{Binding Id}" Cursor="Hand" FontWeight="Bold"/>
+                                                <Button Content="พิมพ์สลิปครัว" Height="28" Padding="10,2" Margin="3,0" Background="#F1F5F9" BorderBrush="#CBD5E1" 
+                                                        Click="BtnOrderPrintKitchen_Click" Tag="{Binding Id}" Cursor="Hand"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- TAB 3: MENU & CATEGORY MANAGEMENT (Dedicated Separate Page) -->
+            <Grid x:Name="ViewMenu" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="380"/> <!-- Categories Panel -->
+                    <ColumnDefinition Width="*"/>   <!-- Products Panel -->
+                </Grid.ColumnDefinitions>
+
+                <!-- LEFT: Categories Management -->
+                <Border Grid.Column="0" Background="White" BorderBrush="#7F9DB9" BorderThickness="1" Margin="0,0,10,0" Padding="12">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="จัดการหมวดหมู่อาหาร (Categories)" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+
+                        <!-- Category DataGrid -->
+                        <DataGrid Grid.Row="1" x:Name="GridCategories" AutoGenerateColumns="False" CanUserAddRows="False"
+                                  BorderBrush="#DCDCDC" GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                                  FontSize="13.5" RowHeight="36" SelectionMode="Single" SelectionChanged="GridCategories_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50"/>
+                                <DataGridTextColumn Header="ชื่อหมวดหมู่" Binding="{Binding Name}" Width="*" FontWeight="Bold"/>
+                                <DataGridTextColumn Header="จำนวนเมนู" Binding="{Binding ProductCount}" Width="80"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Add / Edit Category Form -->
+                        <Border Grid.Row="2" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" Padding="10" Margin="0,10,0,0" CornerRadius="4">
+                            <StackPanel>
+                                <TextBlock Text="แก้ไข / เพิ่มหมวดหมู่:" FontWeight="Bold" FontSize="13.5" Margin="0,0,0,6"/>
+                                <TextBox x:Name="TxtCategoryName" Height="36" FontSize="14" Padding="6,2" VerticalContentAlignment="Center" Margin="0,0,0,6"/>
+                                <TextBlock Text="คำอธิบาย (ไม่บังคับ):" FontSize="12" Foreground="#64748B" Margin="0,0,0,2"/>
+                                <TextBox x:Name="TxtCategoryDesc" Height="34" FontSize="13" Padding="6,2" VerticalContentAlignment="Center" Margin="0,0,0,8"/>
+                                
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="BtnSaveCategory" Grid.Column="0" Content="บันทึกหมวดหมู่" Height="34" Margin="0,0,4,0"
+                                            Background="#15803D" Foreground="White" BorderBrush="#166534" FontWeight="Bold" Click="BtnSaveCategory_Click" Cursor="Hand"/>
+                                    <Button x:Name="BtnNewCategory" Grid.Column="1" Content="+ หมวดใหม่" Height="34" Margin="4,0,4,0"
+                                            Background="#1D4ED8" Foreground="White" BorderBrush="#1E40AF" FontWeight="Bold" Click="BtnNewCategory_Click" Cursor="Hand"/>
+                                    <Button x:Name="BtnDeleteCategory" Grid.Column="2" Content="ลบ" Height="34" Width="44"
+                                            Background="#DC2626" Foreground="White" BorderBrush="#B91C1C" FontWeight="Bold" Click="BtnDeleteCategory_Click" Cursor="Hand"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- RIGHT: Products / Menu Items Management -->
+                <Border Grid.Column="1" Background="White" BorderBrush="#7F9DB9" BorderThickness="1" Padding="12">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header Bar: Category filter & Add button -->
+                        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                            <TextBlock Text="จัดการรายการอาหาร (Menu Items)" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
+                            <Button Content="+ เพิ่มเมนูอาหารใหม่" Height="34" Padding="14,2" HorizontalAlignment="Right"
+                                    Background="#1D4ED8" Foreground="White" BorderBrush="#1E40AF" FontWeight="Bold" FontSize="13.5"
+                                    Click="BtnNewProduct_Click" Cursor="Hand"/>
+                        </DockPanel>
+
+                        <!-- Products DataGrid -->
+                        <DataGrid Grid.Row="1" x:Name="GridManageProducts" AutoGenerateColumns="False" CanUserAddRows="False"
+                                  BorderBrush="#DCDCDC" GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                                  FontSize="13.5" RowHeight="38" SelectionMode="Single" SelectionChanged="GridManageProducts_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="รหัส" Binding="{Binding Code}" Width="75" FontWeight="Bold"/>
+                                <DataGridTextColumn Header="ชื่อเมนูอาหาร" Binding="{Binding Name}" Width="200" FontWeight="Bold"/>
+                                <DataGridTextColumn Header="หมวดหมู่" Binding="{Binding CategoryName}" Width="130"/>
+                                <DataGridTextColumn Header="ราคา (บาท)" Binding="{Binding Price, StringFormat='{}{0:N2}'}" Width="95" FontWeight="Bold"/>
+                                <DataGridTextColumn Header="สเตชั่นครัว" Binding="{Binding KitchenStation}" Width="100"/>
+                                <DataGridTemplateColumn Header="สถานะ" Width="100">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="3" Padding="6,2" HorizontalAlignment="Center">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#DCFCE7"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsAvailable}" Value="False">
+                                                                <Setter Property="Background" Value="#FEE2E2"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock FontWeight="Bold" FontSize="12">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="พร้อมขาย"/>
+                                                            <Setter Property="Foreground" Value="#15803D"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsAvailable}" Value="False">
+                                                                    <Setter Property="Text" Value="หมด"/>
+                                                                    <Setter Property="Foreground" Value="#B91C1C"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="สาเหตุที่หมด" Binding="{Binding OutOfStockReason}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Edit Product Details Panel -->
+                        <Border Grid.Row="2" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" Padding="12" Margin="0,10,0,0" CornerRadius="4">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Row 1: Code, Name, Price, Category, Station -->
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="160"/>
+                                        <ColumnDefinition Width="130"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                        <TextBlock Text="รหัสเมนู:" FontSize="12" FontWeight="SemiBold"/>
+                                        <TextBox x:Name="TxtProductCode" Height="36" FontSize="14" Padding="6,2" VerticalContentAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Margin="0,0,6,0">
+                                        <TextBlock Text="ชื่อเมนูอาหาร:" FontSize="12" FontWeight="SemiBold"/>
+                                        <TextBox x:Name="TxtProductName" Height="36" FontSize="14" Padding="6,2" VerticalContentAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2" Margin="0,0,6,0">
+                                        <TextBlock Text="ราคา (บาท):" FontSize="12" FontWeight="SemiBold"/>
+                                        <TextBox x:Name="TxtProductPrice" Height="36" FontSize="14" Padding="6,2" VerticalContentAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="3" Margin="0,0,6,0">
+                                        <TextBlock Text="หมวดหมู่:" FontSize="12" FontWeight="SemiBold"/>
+                                        <ComboBox x:Name="CmbProductCategory" Height="36" FontSize="13.5" VerticalContentAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="สเตชั่นครัว:" FontSize="12" FontWeight="SemiBold"/>
+                                        <ComboBox x:Name="CmbProductStation" Height="36" FontSize="13.5" VerticalContentAlignment="Center">
+                                            <ComboBoxItem Content="MainKitchen" IsSelected="True"/>
+                                            <ComboBoxItem Content="Bar"/>
+                                            <ComboBoxItem Content="Dessert"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Row 2: Status, Reason -->
+                                <Grid Grid.Row="1" Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <CheckBox x:Name="ChkProductAvailable" Grid.Column="0" Content="พร้อมขาย (Available)" 
+                                              FontSize="14" FontWeight="Bold" VerticalAlignment="Center" Margin="0,14,10,0"/>
+
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="สาเหตุที่สินค้าหมด (ระบุเมื่อของหมด เพื่อแจ้งให้ลูกค้าทราบ):" FontSize="12" FontWeight="SemiBold" Foreground="#B91C1C"/>
+                                        <TextBox x:Name="TxtProductOutOfStockReason" Height="36" FontSize="13.5" Padding="6,2" VerticalContentAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Row 3: Action Buttons -->
+                                <DockPanel Grid.Row="2" LastChildFill="False">
+                                    <Button x:Name="BtnSaveProduct" Content="บันทึกข้อมูลเมนูอาหาร" Height="38" Padding="20,0"
+                                            Background="#15803D" Foreground="White" BorderBrush="#166534" FontWeight="Bold" FontSize="14"
+                                            Click="BtnSaveProduct_Click" Cursor="Hand" Margin="0,0,8,0"/>
+                                    <Button x:Name="BtnToggleProductStock" Content="สลับสถานะ [ พร้อมขาย / หมด ]" Height="38" Padding="14,0"
+                                            Background="#D97706" Foreground="White" BorderBrush="#B45309" FontWeight="Bold" FontSize="13.5"
+                                            Click="BtnToggleProductStock_Click" Cursor="Hand" Margin="0,0,8,0"/>
+                                    <Button x:Name="BtnDeleteProduct" Content="ลบเมนูนี้" Height="38" Padding="14,0"
+                                            Background="#DC2626" Foreground="White" BorderBrush="#B91C1C" FontWeight="Bold" FontSize="13.5"
+                                            Click="BtnDeleteProduct_Click" Cursor="Hand"/>
+                                </DockPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- TAB 4: RAW MATERIALS & INGREDIENT INVENTORY (Dedicated Page Matching Web) -->
+            <Grid x:Name="ViewStock" Visibility="Collapsed">
+                <Border Background="White" BorderBrush="#7F9DB9" BorderThickness="1" Padding="14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- Title & Filter -->
+                            <RowDefinition Height="*"/>    <!-- Ingredients DataGrid -->
+                            <RowDefinition Height="Auto"/> <!-- Stock Adjustment Box -->
+                            <RowDefinition Height="Auto"/> <!-- Add / Edit Ingredient Box -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Header Controls -->
+                        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                            <TextBlock Text="การจัดการสต๊อกวัตถุดิบ (Raw Material Inventory)" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <TextBlock Text="ค้นหาวัตถุดิบ:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="13.5"/>
+                                <TextBox x:Name="TxtSearchIngredient" Width="160" Height="32" FontSize="13.5" Padding="6,2" VerticalContentAlignment="Center" Margin="0,0,10,0" TextChanged="TxtSearchIngredient_TextChanged"/>
+                                <Button Content="รีเฟรชสต๊อก" Height="32" Padding="14,2" Background="#F0F0F0" BorderBrush="#7F9DB9" FontWeight="SemiBold" FontSize="13" Click="BtnRefreshStock_Click" Cursor="Hand"/>
+                            </StackPanel>
+                        </DockPanel>
+
+                        <!-- Ingredients DataGrid -->
+                        <DataGrid Grid.Row="1" x:Name="GridStock" AutoGenerateColumns="False" CanUserAddRows="False"
+                                  BorderBrush="#DCDCDC" GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                                  FontSize="14" RowHeight="36" SelectionMode="Single" SelectionChanged="GridStock_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="รหัสวัตถุดิบ" Binding="{Binding Code}" Width="110" FontWeight="Bold"/>
+                                <DataGridTextColumn Header="ชื่อวัตถุดิบ" Binding="{Binding Name}" Width="240" FontWeight="Bold"/>
+                                <DataGridTextColumn Header="หมวดหมู่วัตถุดิบ" Binding="{Binding Category}" Width="160"/>
+                                <DataGridTextColumn Header="คงเหลือ" Binding="{Binding Quantity, StringFormat='{}{0:N2}'}" Width="110" FontWeight="Bold"/>
+                                <DataGridTextColumn Header="หน่วยนับ" Binding="{Binding Unit}" Width="85"/>
+                                <DataGridTextColumn Header="จุดเตือนขั้นต่ำ" Binding="{Binding MinQuantityAlert, StringFormat='{}{0:N2}'}" Width="110"/>
+                                <DataGridTextColumn Header="ต้นทุน/หน่วย (บ.)" Binding="{Binding CostPrice, StringFormat='{}{0:N2}'}" Width="130"/>
+                                <DataGridTextColumn Header="หมายเหตุ" Binding="{Binding Notes}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Stock Adjustment Box -->
+                        <Border Grid.Row="2" Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1" Margin="0,10,0,8" Padding="12" CornerRadius="4">
+                            <DockPanel LastChildFill="False">
+                                <TextBlock Text="ปรับสต๊อกวัตถุดิบ:" FontWeight="Bold" FontSize="14.5" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBlock x:Name="TxtSelectedStockProduct" Text="(ยังไม่ได้เลือกวัตถุดิบ)" FontWeight="Bold" Foreground="#1D4ED8" FontSize="15" VerticalAlignment="Center" Margin="0,0,16,0"/>
+
+                                <TextBlock Text="ประเภทการปรับ:" VerticalAlignment="Center" FontSize="13.5" Margin="0,0,6,0"/>
+                                <ComboBox x:Name="CmbStockAdjustType" Height="36" Width="140" FontSize="13" VerticalContentAlignment="Center" Margin="0,0,14,0">
+                                    <ComboBoxItem Content="รับเข้าสต๊อก (+)" IsSelected="True" Tag="in"/>
+                                    <ComboBoxItem Content="เบิกใช้ปรุงอาหาร (-)" Tag="out"/>
+                                    <ComboBoxItem Content="เสียหาย/ทิ้ง (-)" Tag="scrap"/>
+                                    <ComboBoxItem Content="ตรวจนับจริง (=)" Tag="set"/>
+                                </ComboBox>
+
+                                <TextBlock Text="จำนวน:" VerticalAlignment="Center" FontSize="13.5" Margin="0,0,6,0"/>
+                                <TextBox x:Name="TxtStockChangeQty" Text="10" Width="80" Height="36" FontSize="15" FontWeight="Bold" VerticalContentAlignment="Center" Margin="0,0,14,0" TextAlignment="Center"/>
+
+                                <TextBlock Text="เหตุผล:" VerticalAlignment="Center" FontSize="13.5" Margin="0,0,6,0"/>
+                                <TextBox x:Name="TxtStockReason" Text="รับวัตถุดิบเข้าคลัง" Width="200" Height="36" FontSize="13.5" VerticalContentAlignment="Center" Margin="0,0,16,0"/>
+
+                                <Button Content="บันทึกการปรับสต๊อก" Height="36" Padding="16,2" Background="#15803D" Foreground="White" BorderBrush="#166534" FontWeight="Bold" FontSize="14" Click="BtnSaveStockAdjust_Click" Cursor="Hand"/>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- Add / Edit Ingredient Form -->
+                        <Border Grid.Row="3" Background="#F1F5F9" BorderBrush="#E2E8F0" BorderThickness="1" Padding="10" CornerRadius="4">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="160"/>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                    <TextBlock Text="รหัสวัตถุดิบ:" FontSize="12"/>
+                                    <TextBox x:Name="TxtIngCode" Height="34" FontSize="13.5" VerticalContentAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Margin="0,0,6,0">
+                                    <TextBlock Text="ชื่อวัตถุดิบ:" FontSize="12"/>
+                                    <TextBox x:Name="TxtIngName" Height="34" FontSize="13.5" VerticalContentAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Margin="0,0,6,0">
+                                    <TextBlock Text="หมวดหมู่:" FontSize="12"/>
+                                    <ComboBox x:Name="CmbIngCategory" Height="34" FontSize="13" VerticalContentAlignment="Center">
+                                        <ComboBoxItem Content="เนื้อสัตว์และอาหารทะเล" IsSelected="True"/>
+                                        <ComboBoxItem Content="ผักและสมุนไพร"/>
+                                        <ComboBoxItem Content="เครื่องปรุงและน้ำมัน"/>
+                                        <ComboBoxItem Content="เส้นและแป้ง"/>
+                                        <ComboBoxItem Content="ข้าวและธัญพืช"/>
+                                        <ComboBoxItem Content="ผลไม้และของหวาน"/>
+                                        <ComboBoxItem Content="เครื่องดื่มและบาร์"/>
+                                        <ComboBoxItem Content="บรรจุภัณฑ์"/>
+                                        <ComboBoxItem Content="ของสดและเบ็ดเตล็ด"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="3" Margin="0,0,6,0">
+                                    <TextBlock Text="หน่วยนับ:" FontSize="12"/>
+                                    <TextBox x:Name="TxtIngUnit" Text="กก." Height="34" FontSize="13.5" VerticalContentAlignment="Center" TextAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="4" Margin="0,0,6,0">
+                                    <TextBlock Text="คงเหลือ:" FontSize="12"/>
+                                    <TextBox x:Name="TxtIngQty" Text="10" Height="34" FontSize="13.5" FontWeight="Bold" VerticalContentAlignment="Center" TextAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="5" Margin="0,0,6,0">
+                                    <TextBlock Text="จุดเตือน:" FontSize="12"/>
+                                    <TextBox x:Name="TxtIngMinAlert" Text="5" Height="34" FontSize="13.5" VerticalContentAlignment="Center" TextAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="6" Margin="0,0,10,0">
+                                    <TextBlock Text="ต้นทุน (บ.):" FontSize="12"/>
+                                    <TextBox x:Name="TxtIngCost" Text="100" Height="34" FontSize="13.5" VerticalContentAlignment="Center" TextAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="7" Orientation="Horizontal" VerticalAlignment="Bottom">
+                                    <Button Content="+ เพิ่มวัตถุดิบ" Height="34" Padding="12,0" Background="#1D4ED8" Foreground="White" BorderBrush="#1E40AF" FontWeight="Bold" FontSize="13" Margin="0,0,4,0" Click="BtnSaveIngredient_Click" Cursor="Hand"/>
+                                    <Button Content="ลบ" Height="34" Width="40" Background="#DC2626" Foreground="White" BorderBrush="#B91C1C" FontWeight="Bold" FontSize="13" Click="BtnDeleteIngredient_Click" Cursor="Hand"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- TAB 5: SALES REPORTS -->
+            <Grid x:Name="ViewReports" Visibility="Collapsed">
+                <Border Background="White" BorderBrush="#7F9DB9" BorderThickness="1" Padding="14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header Bar -->
+                        <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                            <TextBlock Text="รายงานสรุปยอดขายประจำวัน (Daily Sales Overview)" FontWeight="Bold" FontSize="17" VerticalAlignment="Center"/>
+                            <Button Content="รีเฟรชรายงาน" Height="34" Padding="16,2" Background="#F0F0F0" BorderBrush="#7F9DB9" FontWeight="SemiBold" FontSize="13.5" HorizontalAlignment="Right" Click="BtnRefreshReports_Click" Cursor="Hand"/>
+                        </DockPanel>
+
+                        <!-- Metric KPI Cards -->
+                        <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,16">
+                            <!-- Card 1: Total Sales -->
+                            <Border Background="#E8F5E9" BorderBrush="#81C784" BorderThickness="1" Padding="14" Margin="0,0,10,0" CornerRadius="4">
+                                <StackPanel>
+                                    <TextBlock Text="ยอดขายรวมวันนี้" FontSize="14" Foreground="#2E7D32" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="TxtRptTotalSales" Text="0.00 บาท" FontSize="24" FontWeight="Bold" Foreground="#1B5E20" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Card 2: Cash -->
+                            <Border Background="#E3F2FD" BorderBrush="#90CAF9" BorderThickness="1" Padding="14" Margin="0,0,10,0" CornerRadius="4">
+                                <StackPanel>
+                                    <TextBlock Text="เงินสด (Cash)" FontSize="14" Foreground="#1565C0" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="TxtRptCashSales" Text="0.00 บาท" FontSize="22" FontWeight="Bold" Foreground="#0D47A1" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Card 3: QR -->
+                            <Border Background="#FFF3E0" BorderBrush="#FFB74D" BorderThickness="1" Padding="14" Margin="0,0,10,0" CornerRadius="4">
+                                <StackPanel>
+                                    <TextBlock Text="PromptPay QR" FontSize="14" Foreground="#E65100" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="TxtRptQrSales" Text="0.00 บาท" FontSize="22" FontWeight="Bold" Foreground="#BF360C" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Card 4: Orders -->
+                            <Border Background="#EDE7F6" BorderBrush="#B39DDB" BorderThickness="1" Padding="14" CornerRadius="4">
+                                <StackPanel>
+                                    <TextBlock Text="จำนวนบิลสำเร็จ" FontSize="14" Foreground="#512DA8" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="TxtRptTotalOrders" Text="0 บิล" FontSize="24" FontWeight="Bold" Foreground="#311B92" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <!-- Top 10 Best Sellers -->
+                        <Border Grid.Row="2" Background="#FAFAFA" BorderBrush="#E0E0E0" BorderThickness="1" Padding="14" CornerRadius="4">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Text="10 อันดับเมนูขายดีประจำวัน" FontWeight="Bold" FontSize="15" Margin="0,0,0,10"/>
+                                <DataGrid Grid.Row="1" x:Name="GridTopProducts" AutoGenerateColumns="False" CanUserAddRows="False"
+                                          BorderBrush="#DCDCDC" GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                                          FontSize="14" RowHeight="36">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="ชื่อเมนูอาหาร" Binding="{Binding ProductName}" Width="*" FontWeight="SemiBold"/>
+                                        <DataGridTextColumn Header="จำนวนที่ขายได้" Binding="{Binding QuantitySold, StringFormat='{}{0} จาน'}" Width="160" FontWeight="Bold"/>
+                                        <DataGridTextColumn Header="ยอดขายรวม (บาท)" Binding="{Binding TotalRevenue, StringFormat='{}{0:N2}'}" Width="160" FontWeight="Bold"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- TAB 6: SETTINGS, SOUND ALERTS, AUDIT & STORE INFO -->
+            <Grid x:Name="ViewSettings" Visibility="Collapsed">
+                <Border Background="White" BorderBrush="#7F9DB9" BorderThickness="1" Padding="16">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel MaxWidth="720" HorizontalAlignment="Left">
+                            <TextBlock Text="การตั้งค่าระบบ &amp; อุปกรณ์หน้าร้าน (POS Settings)" FontWeight="Bold" FontSize="18" Margin="0,0,0,16"/>
+
+                            <!-- Section 1: Sound & Audio Alerts -->
+                            <Border Background="#F1F5F9" BorderBrush="#CBD5E1" BorderThickness="1" Padding="16" Margin="0,0,0,16" CornerRadius="4">
+                                <StackPanel>
+                                    <TextBlock Text="ระบบเสียงแจ้งเตือนออเดอร์ใหม่ (Sound &amp; Audio Alerts)" FontWeight="Bold" FontSize="15" Foreground="#1E3A8A" Margin="0,0,0,10"/>
+                                    
+                                    <CheckBox x:Name="ChkSoundEnabled" Content="เปิดใช้งานเสียงแจ้งเตือนเมื่อมีออเดอร์ใหม่เข้าสู่ระบบ" 
+                                              IsChecked="True" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" Cursor="Hand"/>
+
+                                    <DockPanel Margin="0,0,0,12">
+                                        <TextBlock Text="ระดับความดังเสียง (Volume):" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <TextBlock x:Name="TxtSoundVolumeLabel" Text="90%" FontSize="15" FontWeight="Bold" Foreground="#1D4ED8" Width="55" VerticalAlignment="Center"/>
+                                        <Slider x:Name="SliderSoundVolume" Minimum="0" Maximum="100" Value="90" TickFrequency="5" IsSnapToTickEnabled="True"
+                                                VerticalAlignment="Center" ValueChanged="SliderSoundVolume_ValueChanged" Cursor="Hand"/>
+                                    </DockPanel>
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="ทดสอบเสียงแจ้งเตือน (Test Sound)" Height="38" Padding="18,0"
+                                                Background="#1D4ED8" Foreground="White" BorderBrush="#1E40AF" FontWeight="Bold" FontSize="14"
+                                                Click="BtnTestSound_Click" Cursor="Hand" Margin="0,0,10,0"/>
+                                        <Button Content="บันทึกการตั้งค่าเสียง" Height="38" Padding="18,0"
+                                                Background="#15803D" Foreground="White" BorderBrush="#166534" FontWeight="Bold" FontSize="14"
+                                                Click="BtnSaveSound_Click" Cursor="Hand"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Section 2: Printer Setup -->
+                            <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" Padding="16" Margin="0,0,0,16" CornerRadius="4">
+                                <StackPanel>
+                                    <TextBlock Text="ตั้งค่าเครื่องพิมพ์สลิปและใบสั่งครัว (Printers &amp; Slips)" FontWeight="Bold" FontSize="15" Foreground="#1E3A8A" Margin="0,0,0,10"/>
+
+                                    <TextBlock Text="เครื่องพิมพ์ใบเสร็จลูกค้า (Receipt Printer):" FontSize="13.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="CmbReceiptPrinter" Height="38" FontSize="14" VerticalContentAlignment="Center" Margin="0,0,0,10"/>
+
+                                    <TextBlock Text="เครื่องพิมพ์ใบสั่งอาหารครัว (Kitchen Printer):" FontSize="13.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="CmbKitchenPrinter" Height="38" FontSize="14" VerticalContentAlignment="Center" Margin="0,0,0,12"/>
+
+                                    <CheckBox x:Name="ChkAutoReceipt" Content="พิมพ์ใบเสร็จอัตโนมัติเมื่อปิดบิล" IsChecked="True" FontSize="14" Margin="0,0,0,6"/>
+                                    <CheckBox x:Name="ChkAutoKitchen" Content="พิมพ์ใบสั่งครัวอัตโนมัติเมื่อส่งออเดอร์" IsChecked="True" FontSize="14" Margin="0,0,0,14"/>
+
+                                    <Button Content="บันทึกการตั้งค่าเครื่องพิมพ์" Width="200" Height="38" Background="#1D4ED8" Foreground="White" 
+                                            BorderBrush="#1E40AF" FontWeight="Bold" FontSize="14" HorizontalAlignment="Left" Click="BtnSavePrinterSettings_Click" Cursor="Hand"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Section 3: Store Info & Tax -->
+                            <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" Padding="16" CornerRadius="4">
+                                <StackPanel>
+                                    <TextBlock Text="ข้อมูลร้านค้าและภาษีมูลค่าเพิ่ม (Store Info &amp; VAT)" FontWeight="Bold" FontSize="15" Foreground="#1E3A8A" Margin="0,0,0,10"/>
+
+                                    <TextBlock Text="ชื่อร้านอาหาร:" FontSize="13.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtStoreName" Height="38" FontSize="14.5" Padding="8,4" VerticalContentAlignment="Center" Margin="0,0,0,10"/>
+
+                                    <TextBlock Text="ที่อยู่ร้าน:" FontSize="13.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtStoreAddress" Height="38" FontSize="14.5" Padding="8,4" VerticalContentAlignment="Center" Margin="0,0,0,10"/>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="15"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="เบอร์โทรศัพท์ร้าน:" FontSize="13.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                            <TextBox x:Name="TxtStorePhone" Height="38" FontSize="14.5" Padding="8,4" VerticalContentAlignment="Center"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="เลขประจำตัวผู้เสียภาษี (Tax ID):" FontSize="13.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                            <TextBox x:Name="TxtTaxId" Height="38" FontSize="14.5" Padding="8,4" VerticalContentAlignment="Center"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="15"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="อัตราภาษีมูลค่าเพิ่ม VAT (%):" FontSize="13.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                            <TextBox x:Name="TxtVatPercent" Text="7.0" Height="38" FontSize="14.5" Padding="8,4" VerticalContentAlignment="Center"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="ค่าบริการ Service Charge (%):" FontSize="13.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                            <TextBox x:Name="TxtServiceChargePercent" Text="0.0" Height="38" FontSize="14.5" Padding="8,4" VerticalContentAlignment="Center"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <TextBlock Text="ข้อความหัวบิล (Header Message):" FontSize="13.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtReceiptHeader" Height="38" FontSize="14.5" Padding="8,4" VerticalContentAlignment="Center" Margin="0,0,0,10"/>
+
+                                    <TextBlock Text="ข้อความท้ายบิล (Footer Message):" FontSize="13.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtReceiptFooter" Height="38" FontSize="14.5" Padding="8,4" VerticalContentAlignment="Center" Margin="0,0,0,16"/>
+
+                                    <Button Content="บันทึกข้อมูลร้านค้าและภาษี" Width="220" Height="40" Background="#15803D" Foreground="White" 
+                                            BorderBrush="#166534" FontWeight="Bold" FontSize="14.5" HorizontalAlignment="Left" Click="BtnSaveStoreSettings_Click" Cursor="Hand"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+
+        </Grid>
+
+        <!-- 4. Bottom Status Bar -->
+        <Border Grid.Row="4" Background="#ECE9D8" BorderBrush="#9E9A8E" BorderThickness="0,1,0,0" Padding="12,0">
+            <DockPanel VerticalAlignment="Center">
+                <TextBlock x:Name="TxtStatusBar" Text="สถานะ: พร้อมทำงาน | เซิร์ฟเวอร์: http://127.0.0.1:5000" FontSize="12.5" Foreground="#333333"/>
+                <TextBlock Text="Windows Desktop POS Classic Edition" FontSize="12.5" Foreground="#666666" HorizontalAlignment="Right"/>
+            </DockPanel>
+        </Border>
+
+    </Grid>
+
+    <Window.Resources>
+        <!-- Tab Radio Style (Large, Touch-Friendly) -->
+        <Style x:Key="TabRadioStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="#D8D4C8"/>
+            <Setter Property="BorderBrush" Value="#9E9A8E"/>
+            <Setter Property="BorderThickness" Value="1,1,1,0"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="4,4,0,0"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="White"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#7F9DB9"/>
+                                <Setter Property="Foreground" Value="#245EDC"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Small Tab Radio Style -->
+        <Style x:Key="SmallTabRadioStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="#F0F0F0"/>
+            <Setter Property="BorderBrush" Value="#7F9DB9"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="b" Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                Padding="8,4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="b" Property="Background" Value="#316AC5"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- POS Table Button Style with Hover and Selection States -->
+        <Style x:Key="PosTableButtonStyle" TargetType="Button">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="MinWidth" Value="42"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#1E293B"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#DBEAFE"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#2563EB"/>
+                                <Setter Property="Foreground" Value="#1D4ED8"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#BFDBFE"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#1D4ED8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+</Window>

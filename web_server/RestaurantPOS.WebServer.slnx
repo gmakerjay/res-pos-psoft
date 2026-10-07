@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="RestaurantPOS.Server/RestaurantPOS.Server.csproj" />
+    <Project Path="RestaurantPOS.Shared/RestaurantPOS.Shared.csproj" />
+  </Folder>
+</Solution>

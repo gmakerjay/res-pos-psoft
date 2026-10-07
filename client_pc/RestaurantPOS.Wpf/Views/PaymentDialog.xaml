@@ -1,0 +1,130 @@
+<Window x:Class="RestaurantPOS.Wpf.Views.PaymentDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ชำระเงินและปิดบิล (Cashier Payment &amp; Checkout)" 
+        Height="620" Width="720"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#ECE9D8"
+        FontFamily="Segoe UI, Tahoma"
+        FontSize="15">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#245EDC" Padding="16,12" Margin="0,0,0,14" CornerRadius="4">
+            <DockPanel>
+                <TextBlock x:Name="TxtBillTitle" Text="ชำระเงิน: โต๊ะ T01 (ORD-20261006-0001)" 
+                           FontWeight="Bold" FontSize="17" Foreground="White" VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtItemsCount" Text="5 รายการ" HorizontalAlignment="Right" 
+                           FontSize="14" FontWeight="SemiBold" Foreground="#E0EDFF" VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Main Body -->
+        <Border Grid.Row="1" Background="White" BorderBrush="#7F9DB9" BorderThickness="1" Padding="16" CornerRadius="4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="260"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left Column: Payment Methods -->
+                <StackPanel Grid.Column="0" Margin="0,0,18,0">
+                    <TextBlock Text="วิธีชำระเงิน (Payment Method):" FontWeight="Bold" FontSize="14.5" Margin="0,0,0,12"/>
+                    
+                    <RadioButton x:Name="RbCash" Content="เงินสด (Cash)" IsChecked="True" 
+                                 FontSize="14.5" FontWeight="SemiBold" Margin="0,0,0,12" Checked="PaymentMethod_Changed" Cursor="Hand"/>
+                    <RadioButton x:Name="RbPromptPay" Content="สแกน QR PromptPay" 
+                                 FontSize="14.5" FontWeight="SemiBold" Margin="0,0,0,12" Checked="PaymentMethod_Changed" Cursor="Hand"/>
+                    <RadioButton x:Name="RbCard" Content="บัตรเครดิต/เดบิต (Card)" 
+                                 FontSize="14.5" FontWeight="SemiBold" Margin="0,0,0,12" Checked="PaymentMethod_Changed" Cursor="Hand"/>
+                    <RadioButton x:Name="RbTransfer" Content="โอนเงินผ่านธนาคาร (Transfer)" 
+                                 FontSize="14.5" FontWeight="SemiBold" Margin="0,0,0,12" Checked="PaymentMethod_Changed" Cursor="Hand"/>
+
+                    <Separator Margin="0,12,0,14"/>
+
+                    <CheckBox x:Name="ChkPrintReceipt" Content="พิมพ์ใบเสร็จรับเงิน (Print Receipt)" 
+                              IsChecked="True" FontSize="13.5" FontWeight="SemiBold" Margin="0,0,0,8" Cursor="Hand"/>
+                    <CheckBox x:Name="ChkPrintKitchen" Content="พิมพ์ใบสั่งครัว (Kitchen Slip)" 
+                              IsChecked="False" FontSize="13.5" FontWeight="SemiBold" Cursor="Hand"/>
+                </StackPanel>
+
+                <!-- Right Column: Amount & Calculations -->
+                <Border Grid.Column="1" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" Padding="16" CornerRadius="4">
+                    <StackPanel>
+                        <!-- Subtotal -->
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock Text="ยอดรวมค่าอาหาร:" FontSize="14.5" Foreground="#64748B" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtSubtotal" Text="0.00 บาท" FontSize="16" FontWeight="Bold" 
+                                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </DockPanel>
+
+                        <!-- Discount -->
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock Text="ส่วนลด (บาท):" FontSize="14.5" Foreground="#64748B" VerticalAlignment="Center"/>
+                            <TextBox x:Name="TxtDiscount" Text="0" Width="120" Height="36" HorizontalAlignment="Right"
+                                     HorizontalContentAlignment="Right" VerticalContentAlignment="Center"
+                                     FontFamily="Consolas" FontSize="16" FontWeight="Bold" BorderBrush="#7F9DB9"
+                                     TextChanged="TxtDiscount_TextChanged"/>
+                        </DockPanel>
+
+                        <Separator Margin="0,6,0,12"/>
+
+                        <!-- Total Payable -->
+                        <Border Background="#EFF6FF" BorderBrush="#3B82F6" BorderThickness="1.5" Padding="12" Margin="0,0,0,14" CornerRadius="4">
+                            <DockPanel>
+                                <TextBlock Text="ยอดสุทธิที่ต้องชำระ:" FontSize="15" FontWeight="Bold" Foreground="#1E40AF" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtTotal" Text="0.00 บาท" FontSize="26" FontWeight="Bold" Foreground="#DC2626"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- Cash Received Section -->
+                        <StackPanel x:Name="PanelCash">
+                            <DockPanel Margin="0,0,0,10">
+                                <TextBlock Text="รับเงินมา (บาท):" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TxtCashReceived" Text="" Width="160" Height="40" HorizontalAlignment="Right"
+                                         HorizontalContentAlignment="Right" VerticalContentAlignment="Center"
+                                         FontFamily="Consolas" FontSize="20" FontWeight="Bold" BorderBrush="#2563EB"
+                                         TextChanged="TxtCashReceived_TextChanged"/>
+                            </DockPanel>
+
+                            <!-- Quick Cash Buttons -->
+                            <UniformGrid Columns="4" Margin="0,4,0,12" Height="36">
+                                <Button Content="พอดี" Margin="2,0" Background="#F1F5F9" BorderBrush="#CBD5E1" FontWeight="Bold" FontSize="13.5" Click="BtnQuickCash_Exact" Cursor="Hand"/>
+                                <Button Content="100" Margin="2,0" Background="#F1F5F9" BorderBrush="#CBD5E1" FontWeight="Bold" FontSize="13.5" Click="BtnQuickCash_100" Cursor="Hand"/>
+                                <Button Content="500" Margin="2,0" Background="#F1F5F9" BorderBrush="#CBD5E1" FontWeight="Bold" FontSize="13.5" Click="BtnQuickCash_500" Cursor="Hand"/>
+                                <Button Content="1,000" Margin="2,0" Background="#F1F5F9" BorderBrush="#CBD5E1" FontWeight="Bold" FontSize="13.5" Click="BtnQuickCash_1000" Cursor="Hand"/>
+                            </UniformGrid>
+
+                            <!-- Change -->
+                            <DockPanel Margin="0,4,0,0">
+                                <TextBlock Text="เงินทอน:" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtChange" Text="0.00 บาท" FontSize="24" FontWeight="Bold" 
+                                           Foreground="#16A34A" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </StackPanel>
+
+                    </StackPanel>
+                </Border>
+
+            </Grid>
+        </Border>
+
+        <!-- Bottom Actions -->
+        <DockPanel Grid.Row="2" Margin="0,14,0,0">
+            <Button Content="ยกเลิก (Esc)" Width="120" Height="40" Background="#F1F5F9" BorderBrush="#CBD5E1"
+                    FontWeight="SemiBold" FontSize="14" Click="BtnCancel_Click" Cursor="Hand"/>
+            
+            <Button x:Name="BtnConfirm" Content="ยืนยันการชำระเงิน (Enter)" Height="42" Padding="24,2"
+                    HorizontalAlignment="Right" Background="#15803D" Foreground="White" BorderBrush="#166534"
+                    FontWeight="Bold" FontSize="16" Click="BtnConfirm_Click" Cursor="Hand"/>
+        </DockPanel>
+    </Grid>
+</Window>

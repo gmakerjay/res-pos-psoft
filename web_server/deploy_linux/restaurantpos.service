@@ -1,0 +1,19 @@
+[Unit]
+Description=Restaurant POS Central Server (.NET 10 Web API & SignalR)
+After=network.target
+
+[Service]
+Type=simple
+User=posadmin
+WorkingDirectory=/var/www/restaurantpos/server
+ExecStart=/usr/bin/dotnet /var/www/restaurantpos/server/RestaurantPOS.Server.dll
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+SyslogIdentifier=restaurantpos-server
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+Environment=ASPNETCORE_URLS=http://0.0.0.0:5000
+
+[Install]
+WantedBy=multi-user.target

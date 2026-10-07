@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/web_server/">
+    <Project Path="web_server/RestaurantPOS.Server/RestaurantPOS.Server.csproj" />
+    <Project Path="web_server/RestaurantPOS.Shared/RestaurantPOS.Shared.csproj" />
+  </Folder>
+  <Folder Name="/client_pc/">
+    <Project Path="client_pc/RestaurantPOS.Wpf/RestaurantPOS.Wpf.csproj" />
+    <Project Path="client_pc/RestaurantPOS.Shared/RestaurantPOS.Shared.csproj" />
+  </Folder>
+</Solution>
