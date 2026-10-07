@@ -6,12 +6,17 @@ import time
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-LOCAL_DIR = r"C:\Users\admin\Documents\res-pos_psoft\deploy_output\linux_server"
-TAR_FILE = r"C:\Users\admin\Documents\res-pos_psoft\temp_deploy.tar.gz"
-REMOTE_HOST = "192.168.1.247"
-REMOTE_USER = "pon"
-REMOTE_PASS = "p1234455"
-REMOTE_DIR = "/home/pon/restaurantpos"
+# ==============================================================================
+# Configuration Template
+# Set environment variables or configure your local deployment parameters here.
+# Note: Keep actual credentials in local deploy_remote.py (ignored by git).
+# ==============================================================================
+LOCAL_DIR = os.getenv("DEPLOY_LOCAL_DIR", r"./deploy_output/linux_server")
+TAR_FILE = os.getenv("DEPLOY_TAR_FILE", r"./temp_deploy.tar.gz")
+REMOTE_HOST = os.getenv("DEPLOY_REMOTE_HOST", "192.168.1.xxx")
+REMOTE_USER = os.getenv("DEPLOY_REMOTE_USER", "user")
+REMOTE_PASS = os.getenv("DEPLOY_REMOTE_PASS", "your_password_here")
+REMOTE_DIR = os.getenv("DEPLOY_REMOTE_DIR", "/home/user/restaurantpos")
 
 print("[1/6] Packaging deployment directory into temporary tarball...")
 with tarfile.open(TAR_FILE, "w:gz") as tar:
@@ -31,7 +36,6 @@ ssh.connect(REMOTE_HOST, username=REMOTE_USER, password=REMOTE_PASS, timeout=20)
 
 sftp = ssh.open_sftp()
 
-print("[3/6] Stopping old spk-group in PM2 (leaving ALL pcom services untouched)...")
 def run_ssh(cmd, use_sudo=False):
     if use_sudo:
         full_cmd = f"echo '{REMOTE_PASS}' | sudo -S bash -c \"{cmd}\""
@@ -42,10 +46,7 @@ def run_ssh(cmd, use_sudo=False):
     err = stderr.read().decode('utf-8', errors='replace')
     return out, err
 
-out, err = run_ssh("pm2 stop spk-group && pm2 save")
-print("PM2 Output:\n", out)
-
-print("[4/6] Uploading application to remote server...")
+print("[3/6] Preparing remote target directory...")
 run_ssh(f"mkdir -p {REMOTE_DIR}")
 
 def progress(transferred, total):
@@ -62,12 +63,12 @@ sftp.close()
 if os.path.exists(TAR_FILE):
     os.remove(TAR_FILE)
 
-print("[5/6] Extracting files and setting permissions...")
+print("[4/6] Extracting files and setting permissions...")
 extract_cmd = f"cd {REMOTE_DIR} && tar -xzf temp_deploy.tar.gz && rm temp_deploy.tar.gz && chmod +x {REMOTE_DIR}/RestaurantPOS.Server"
 out, err = run_ssh(extract_cmd)
 print("Extract output:\n", out)
 
-print("[6/6] Installing and starting systemd service...")
+print("[5/6] Installing and starting systemd service...")
 service_content = f"""[Unit]
 Description=Restaurant POS Central Server (.NET 10 Web API & SignalR)
 After=network.target
@@ -101,10 +102,6 @@ print(out)
 
 print("=== TESTING LOCAL HEALTH ENDPOINT ON PORT 3000 ===")
 out, err = run_ssh("curl -s http://127.0.0.1:3000/api/health")
-print(out)
-
-print("=== CHECKING PM2 STATUS (ALL PCOM MUST REMAIN ONLINE) ===")
-out, err = run_ssh("pm2 list")
 print(out)
 
 ssh.close()

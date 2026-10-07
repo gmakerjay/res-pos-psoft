@@ -23,6 +23,17 @@ deploy_output/
 test_linux_publish/
 deploylocal/
 
+# Remote Deployment & SSH Credentials (Local Machine Only)
+*deploy_remote*.py
+temp_deploy.tar.gz
+*.tar.gz
+*.pem
+*.key
+*.id_rsa
+*.ppk
+.env*
+deploy_secrets/
+
 # Databases & Runtime Logs
 *.db
 *.db-shm
