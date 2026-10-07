@@ -402,6 +402,10 @@ export async function getActiveOrdersByTable(tableRef: string): Promise<Order[]>
   return request<Order[]>(`/api/orders/table/${encodeURIComponent(tableRef)}`);
 }
 
+export async function trackOrdersByPhone(phone: string): Promise<Order[]> {
+  return request<Order[]>(`/api/orders/track/${encodeURIComponent(phone.trim())}`);
+}
+
 export async function updateOrderStatus(orderId: number, status: number): Promise<Order> {
   return request<Order>(`/api/orders/${orderId}/status`, {
     method: 'PUT',

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   getCategories, createCategory, updateCategory, deleteCategory,
   getProducts, createProduct, updateProduct, deleteProduct, createOrder, getActiveOrders, 
+  trackOrdersByPhone,
   updateOrderStatus, getDailyReport, checkServerHealth, login, logout, 
   getStoredUser, uploadProductImage, getIngredients, createIngredient,
   updateIngredient, deleteIngredient, adjustIngredientStock, getAuditLogs,
@@ -396,6 +397,30 @@ export function App() {
                 title="ทดลองเข้าสู่ระบบจัดการและจอครัว KDS (admin / psoft123)"
               >
                 [ ลองเข้าจอครัว &amp; จัดการร้าน ]
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const trackEl = document.getElementById('order-tracking-section');
+                  if (trackEl) {
+                    trackEl.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.25)',
+                  color: '#FFF',
+                  border: '1px solid rgba(255,255,255,0.5)',
+                  padding: '4px 10px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+                title="ติดตามสถานะออเดอร์ด้วยเบอร์โทรศัพท์"
+              >
+                [ ติดตามออเดอร์ ]
               </button>
 
               <button
@@ -868,6 +893,68 @@ function CustomerView({
     } catch {}
   };
 
+  // Order Tracking by Phone Number
+  const [trackedPhone, setTrackedPhone] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      const code = getStoredTenantCode() || 'DEFAULT';
+      return localStorage.getItem(`rpos_tracked_phone_${code}`) || '';
+    } catch {
+      return '';
+    }
+  });
+  const [trackPhoneInput, setTrackPhoneInput] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      const code = getStoredTenantCode() || 'DEFAULT';
+      return localStorage.getItem(`rpos_tracked_phone_${code}`) || '';
+    } catch {
+      return '';
+    }
+  });
+  const [trackedOrders, setTrackedOrders] = useState<Order[]>([]);
+  const [isTrackingLoading, setIsTrackingLoading] = useState<boolean>(false);
+  const [trackingError, setTrackingError] = useState<string>('');
+  const [isTrackingCardExpanded, setIsTrackingCardExpanded] = useState<boolean>(true);
+  const [showPhoneSearchBox, setShowPhoneSearchBox] = useState<boolean>(false);
+
+  const fetchTrackedOrders = async (phone: string, showEmptyAlert = true) => {
+    const clean = phone.replace(/\D/g, '');
+    if (!clean || clean.length < 9) {
+      setTrackingError('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (อย่างน้อย 9-10 หลัก)');
+      return;
+    }
+    setIsTrackingLoading(true);
+    setTrackingError('');
+    try {
+      const orders = await trackOrdersByPhone(clean);
+      setTrackedOrders(orders);
+      setTrackedPhone(clean);
+      setShowPhoneSearchBox(false);
+      const code = getStoredTenantCode() || 'DEFAULT';
+      localStorage.setItem(`rpos_tracked_phone_${code}`, clean);
+      if (orders.length === 0 && showEmptyAlert) {
+        setTrackingError('ไม่พบข้อมูลออเดอร์สำหรับเบอร์โทรนี้ในรอบ 24 ชั่วโมงที่ผ่านมา');
+      }
+    } catch (err: any) {
+      setTrackingError(err.message || 'ไม่สามารถค้นหาออเดอร์ได้');
+    } finally {
+      setIsTrackingLoading(false);
+    }
+  };
+
+  const handleClearTrackingPhone = () => {
+    setTrackedPhone('');
+    setTrackPhoneInput('');
+    setTrackedOrders([]);
+    setTrackingError('');
+    setShowPhoneSearchBox(true);
+    try {
+      const code = getStoredTenantCode() || 'DEFAULT';
+      localStorage.removeItem(`rpos_tracked_phone_${code}`);
+    } catch {}
+  };
+
   // Modal for customizing item notes before adding
   const [itemToCustom, setItemToCustom] = useState<ProductItem | null>(null);
   const [customNotes, setCustomNotes] = useState<string>('');
@@ -900,6 +987,15 @@ function CustomerView({
   useEffect(() => {
     loadData();
 
+    // Auto-fetch tracked orders if a phone number was previously saved
+    try {
+      const code = getStoredTenantCode() || 'DEFAULT';
+      const savedPhone = localStorage.getItem(`rpos_tracked_phone_${code}`);
+      if (savedPhone) {
+        fetchTrackedOrders(savedPhone, false);
+      }
+    } catch {}
+
     // Listen to real-time order status updates strictly for THIS customer's active order
     const unsubOrder = realtimeService.onOrderStatusChanged((updated) => {
       setActiveOrder((prev) => {
@@ -917,6 +1013,17 @@ function CustomerView({
         }
         return prev;
       });
+
+      setTrackedOrders((prevList) => {
+        const found = prevList.find(o => o.id === updated.id);
+        if (found) {
+          if (found.status !== 4 && updated.status === 4) {
+            playOrderReadyChime();
+          }
+          return prevList.map(o => o.id === updated.id ? { ...o, status: updated.status } : o);
+        }
+        return prevList;
+      });
     });
 
     const unsubBillClosed = realtimeService.onBillClosed((closedOrder) => {
@@ -929,6 +1036,10 @@ function CustomerView({
           return { ...prev, status: 5 };
         }
         return prev;
+      });
+
+      setTrackedOrders((prevList) => {
+        return prevList.map(o => o.id === closedOrder.id ? { ...o, status: 5 } : o);
       });
     });
 
@@ -1042,7 +1153,19 @@ function CustomerView({
       setCart([]);
       setShowCartDrawer(false);
       setShowConfirmModal(false);
-      alert(`สั่งอาหารเรียบร้อยแล้ว!\nเลขที่ออเดอร์: ${newOrder.orderNumber}\nระบบได้ส่งออเดอร์ไปยังเครื่องหลักหน้าร้านเรียบร้อยแล้ว`);
+
+      // Automatically track this phone and refresh tracked list
+      const cleanPhone = phone.replace(/\D/g, '');
+      setTrackedPhone(cleanPhone);
+      setTrackPhoneInput(cleanPhone);
+      setShowPhoneSearchBox(false);
+      try {
+        const code = getStoredTenantCode() || 'DEFAULT';
+        localStorage.setItem(`rpos_tracked_phone_${code}`, cleanPhone);
+      } catch {}
+      fetchTrackedOrders(cleanPhone, false);
+
+      alert(`สั่งอาหารเรียบร้อยแล้ว!\nเลขที่ออเดอร์: ${newOrder.orderNumber}\nระบบได้ส่งออเดอร์ไปยังเครื่องหลักหน้าร้านเรียบร้อยแล้ว\nท่านสามารถติดตามความคืบหน้าการทำอาหารผ่านเบอร์โทร ${cleanPhone} ได้ทันที`);
     } catch (err: any) {
       alert('ไม่สามารถส่งออเดอร์ได้: ' + err.message);
     } finally {
@@ -1332,86 +1455,347 @@ function CustomerView({
             />
           </div>
         </div>
-
-        {activeOrder && (
-          <div style={{
-            backgroundColor: '#E8F5E9',
-            border: '1px solid #81C784',
-            padding: '8px 14px',
-            borderRadius: '6px',
-            textAlign: 'right',
-            marginTop: '10px'
-          }}>
-            <div style={{ fontSize: '11px', color: '#2E7D32', fontWeight: 'bold' }}>
-              ออเดอร์ล่าสุด #{activeOrder.orderNumber}
-            </div>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1B5E20' }}>
-              สถานะ: {getStatusText(activeOrder.status)}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Real-time Order Tracking Timeline */}
-      {activeOrder && (
+      {/* Phone-Based Real-time Order Tracking Section */}
+      <div id="order-tracking-section" style={{
+        backgroundColor: '#FFF',
+        borderRadius: '8px',
+        border: '1.5px solid #BAE6FD',
+        borderLeft: '5px solid #0284C7',
+        padding: '16px',
+        marginBottom: '16px',
+        boxShadow: 'var(--shadow)',
+        boxSizing: 'border-box',
+        width: '100%'
+      }}>
+        {/* Tracking Header Bar */}
         <div style={{
-          backgroundColor: '#FFF',
-          padding: '16px 20px',
-          borderRadius: '8px',
-          marginBottom: '16px',
-          boxShadow: 'var(--shadow)',
-          borderLeft: '5px solid #2E7D32'
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '10px'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1B5E20' }}>
-              การติดตามสถานะออเดอร์แบบ Real-time: #{activeOrder.orderNumber}
-            </h3>
-            <span style={{ fontSize: '12px', color: '#666' }}>
-              โต๊ะ: {activeOrder.tableNumber} | ยอดรวม: {activeOrder.totalAmount.toFixed(2)} บาท
-            </span>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{
+                backgroundColor: '#0284C7',
+                color: '#FFF',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}>
+                [ ติดตามสถานะออเดอร์ ]
+              </span>
+              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#0369A1', margin: 0 }}>
+                {trackedPhone ? `เบอร์โทรศัพท์ที่ติดตาม: ${trackedPhone}` : 'ตรวจสอบความคืบหน้าของออเดอร์'}
+              </h3>
+            </div>
+            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
+              {trackedPhone 
+                ? 'ระบบอัปเดตสถานะแบบ Real-time ทันทีเมื่อห้องครัวหรือแคชเชียร์อัปเดตขั้นตอน' 
+                : 'กรุณากรอกเบอร์โทรศัพท์ที่ใช้สั่งอาหาร เพื่อติดตามสถานะการทำอาหารแบบเรียลไทม์'}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', marginTop: '10px' }}>
-            {[
-              { step: 1, label: '[รอรับออเดอร์]' },
-              { step: 2, label: '[รับออเดอร์แล้ว]' },
-              { step: 3, label: '[กำลังปรุง]' },
-              { step: 4, label: '[พร้อมเสิร์ฟ]' },
-              { step: 5, label: '[เสร็จสิ้น]' }
-            ].map((s) => {
-              const isPassed = activeOrder.status >= s.step;
-              const isCurrent = activeOrder.status === s.step;
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {trackedPhone && (
+              <button
+                type="button"
+                onClick={() => fetchTrackedOrders(trackedPhone, true)}
+                disabled={isTrackingLoading}
+                style={{
+                  backgroundColor: '#F0F9FF',
+                  border: '1px solid #7DD3FC',
+                  color: '#0369A1',
+                  padding: '5px 12px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  cursor: isTrackingLoading ? 'wait' : 'pointer'
+                }}
+              >
+                {isTrackingLoading ? '[ กำลังอัปเดต... ]' : '[ รีเฟรชสถานะ ]'}
+              </button>
+            )}
+
+            {trackedPhone && (
+              <button
+                type="button"
+                onClick={handleClearTrackingPhone}
+                style={{
+                  backgroundColor: '#FFF',
+                  border: '1px solid #CBD5E1',
+                  color: '#475569',
+                  padding: '5px 12px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  cursor: 'pointer'
+                }}
+              >
+                [ เปลี่ยนเบอร์โทร ]
+              </button>
+            )}
+
+            {trackedOrders.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsTrackingCardExpanded(!isTrackingCardExpanded)}
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  color: '#475569',
+                  padding: '5px 10px',
+                  borderRadius: '4px',
+                  fontSize: '11.5px',
+                  cursor: 'pointer'
+                }}
+              >
+                {isTrackingCardExpanded ? '[ พับเก็บ ]' : `[ แสดงออเดอร์ (${trackedOrders.length}) ]`}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Input box for Phone Search */}
+        {(!trackedPhone || showPhoneSearchBox) && (
+          <div style={{
+            marginTop: '12px',
+            backgroundColor: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '6px',
+            padding: '12px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+            alignItems: 'center'
+          }}>
+            <div style={{ flex: '1 1 200px' }}>
+              <input
+                type="tel"
+                placeholder="กรุณากรอกเบอร์โทรเพื่อติดตามออเดอร์ เช่น 0812345678"
+                value={trackPhoneInput}
+                onChange={(e) => setTrackPhoneInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    fetchTrackedOrders(trackPhoneInput, true);
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  border: '1px solid #94A3B8',
+                  fontSize: '13px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => fetchTrackedOrders(trackPhoneInput, true)}
+              disabled={isTrackingLoading}
+              style={{
+                backgroundColor: '#0284C7',
+                color: '#FFF',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                cursor: isTrackingLoading ? 'wait' : 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {isTrackingLoading ? '[ กำลังค้นหา... ]' : '[ ค้นหาออเดอร์ ]'}
+            </button>
+            {trackedPhone && (
+              <button
+                type="button"
+                onClick={() => setShowPhoneSearchBox(false)}
+                style={{
+                  backgroundColor: '#FFF',
+                  color: '#64748B',
+                  border: '1px solid #CBD5E1',
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                [ ยกเลิก ]
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Error message */}
+        {trackingError && (
+          <div style={{
+            marginTop: '10px',
+            backgroundColor: '#FEF2F2',
+            border: '1px solid #FCA5A5',
+            color: '#B91C1C',
+            padding: '8px 12px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: 'bold'
+          }}>
+            [ ข้อความ: {trackingError} ]
+          </div>
+        )}
+
+        {/* Order Cards List */}
+        {isTrackingCardExpanded && (trackedOrders.length > 0 || activeOrder) && (
+          <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {(trackedOrders.length > 0 ? trackedOrders : (activeOrder ? [activeOrder] : [])).map((ord) => {
+              const isOrderActive = ord.status < 5;
+              const isReady = ord.status === 4;
+              const isCompleted = ord.status === 5;
+              const isCancelled = ord.status === 6;
+
               return (
-                <div key={s.step} style={{ textAlign: 'center', flex: 1 }}>
+                <div
+                  key={ord.id}
+                  style={{
+                    backgroundColor: isReady ? '#F0FDF4' : (isOrderActive ? '#F8FAFC' : '#FFF'),
+                    border: isReady ? '1.5px solid #22C55E' : (isOrderActive ? '1px solid #CBD5E1' : '1px solid #E2E8F0'),
+                    borderRadius: '6px',
+                    padding: '12px 14px'
+                  }}
+                >
+                  {/* Order Card Header */}
                   <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    backgroundColor: isCurrent ? '#EF6C00' : (isPassed ? '#2E7D32' : '#E0E0E0'),
-                    color: '#FFF',
                     display: 'flex',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 6px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    boxShadow: isCurrent ? '0 0 8px rgba(239, 108, 0, 0.6)' : 'none'
+                    flexWrap: 'wrap',
+                    gap: '6px',
+                    marginBottom: '8px'
                   }}>
-                    {s.step}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#0F172A' }}>
+                        บิล #{ord.orderNumber}
+                      </span>
+                      <span style={{
+                        backgroundColor: '#E2E8F0',
+                        color: '#334155',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 'bold'
+                      }}>
+                        {ord.tableNumber || (ord.type === 2 ? 'สั่งกลับบ้าน' : 'สั่งออนไลน์')}
+                      </span>
+                      <span style={{ fontSize: '11.5px', color: '#64748B' }}>
+                        เวลา: {new Date(ord.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
+                      </span>
+                    </div>
+
+                    <div>
+                      <span style={{
+                        backgroundColor: isCancelled ? '#EF4444' : (isReady ? '#16A34A' : (isCompleted ? '#64748B' : '#0284C7')),
+                        color: '#FFF',
+                        padding: '3px 10px',
+                        borderRadius: '12px',
+                        fontSize: '11.5px',
+                        fontWeight: 'bold'
+                      }}>
+                        [ {getStatusText(ord.status)} ]
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Stepper Timeline for Active / In-progress Orders */}
+                  {!isCancelled && (
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      position: 'relative',
+                      margin: '12px 0 10px',
+                      padding: '4px 0'
+                    }}>
+                      {[
+                        { step: 1, label: 'รอรับออเดอร์' },
+                        { step: 2, label: 'รับออเดอร์' },
+                        { step: 3, label: 'กำลังปรุง' },
+                        { step: 4, label: 'พร้อมเสิร์ฟ' },
+                        { step: 5, label: 'เสร็จสิ้น' }
+                      ].map((s) => {
+                        const isPassed = ord.status >= s.step;
+                        const isCurrent = ord.status === s.step;
+                        return (
+                          <div key={s.step} style={{ textAlign: 'center', flex: 1 }}>
+                            <div style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '50%',
+                              backgroundColor: isCurrent 
+                                ? (s.step === 4 ? '#16A34A' : '#0284C7') 
+                                : (isPassed ? '#10B981' : '#E2E8F0'),
+                              color: isPassed || isCurrent ? '#FFF' : '#64748B',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              margin: '0 auto 4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              boxShadow: isCurrent ? '0 0 8px rgba(2, 132, 199, 0.5)' : 'none'
+                            }}>
+                              {s.step}
+                            </div>
+                            <div style={{
+                              fontSize: '10.5px',
+                              fontWeight: isCurrent ? 'bold' : 'normal',
+                              color: isCurrent ? '#0284C7' : (isPassed ? '#10B981' : '#94A3B8')
+                            }}>
+                              {s.label}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Items summary */}
                   <div style={{
-                    fontSize: '11px',
-                    fontWeight: isCurrent ? 'bold' : 'normal',
-                    color: isCurrent ? '#EF6C00' : (isPassed ? '#2E7D32' : '#888')
+                    marginTop: '8px',
+                    paddingTop: '8px',
+                    borderTop: '1px dashed #E2E8F0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                    fontSize: '12px'
                   }}>
-                    {s.label}
+                    <div style={{ color: '#475569' }}>
+                      {ord.items && ord.items.map((it, idx) => (
+                        <div key={idx} style={{ marginBottom: '2px' }}>
+                          • {it.quantity}x {it.productName}
+                          {it.specialNotes && <span style={{ color: '#E11D48', marginLeft: '4px' }}>({it.specialNotes})</span>}
+                        </div>
+                      ))}
+                      {ord.notes && (
+                        <div style={{ color: '#2563EB', fontWeight: 'bold', marginTop: '4px' }}>
+                          หมายเหตุ: {ord.notes}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#0F172A' }}>
+                        ยอดรวม: {ord.totalAmount.toFixed(2)} บาท
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Categories Horizontal Pills */}
       <div style={{

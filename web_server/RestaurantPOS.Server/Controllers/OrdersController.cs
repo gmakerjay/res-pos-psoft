@@ -339,6 +339,37 @@ public class OrdersController : ControllerBase
         return Ok(ApiResponse<List<OrderDto>>.Ok(matches.Select(MapToDto).ToList()));
     }
 
+    [HttpGet("track/{phone}")]
+    public async Task<ActionResult<ApiResponse<List<OrderDto>>>> TrackOrdersByPhone(string phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone))
+            return BadRequest(ApiResponse<List<OrderDto>>.Fail("Phone number is required", ErrorCodes.ValidationError));
+
+        var cleanPhone = new string(phone.Where(char.IsDigit).ToArray());
+        if (cleanPhone.Length < 9)
+            return BadRequest(ApiResponse<List<OrderDto>>.Fail("กรุณาระบุเบอร์โทรศัพท์อย่างน้อย 9-10 หลัก", ErrorCodes.ValidationError));
+
+        // Fetch orders created within the last 24 hours matching this phone number
+        var cutoff = DateTime.UtcNow.AddHours(-24);
+        var orders = await _db.Orders
+            .Include(o => o.Table)
+            .Include(o => o.Items)
+                .ThenInclude(i => i.Options)
+            .Where(o => o.CustomerPhone != null && o.CreatedAt >= cutoff)
+            .ToListAsync();
+
+        var matches = orders
+            .Where(o =>
+            {
+                var oPhone = new string((o.CustomerPhone ?? "").Where(char.IsDigit).ToArray());
+                return oPhone.Length >= 9 && (oPhone.EndsWith(cleanPhone) || cleanPhone.EndsWith(oPhone));
+            })
+            .OrderByDescending(o => o.CreatedAt)
+            .ToList();
+
+        return Ok(ApiResponse<List<OrderDto>>.Ok(matches.Select(MapToDto).ToList()));
+    }
+
     [HttpPost("table/{tableRef}/pay")]
     public async Task<ActionResult<ApiResponse<OrderDto>>> PayTableOrders(string tableRef, [FromBody] PaymentRequest req)
     {
