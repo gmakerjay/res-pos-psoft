@@ -176,9 +176,31 @@ public class StoresController : ControllerBase
         }));
     }
 
+    private bool IsDevAuthorized()
+    {
+        var devKey = Request.Headers["X-Dev-Key"].ToString();
+        if (devKey == "rpos_dev_master_2026" || devKey == "dev2026" || devKey == "9999")
+        {
+            return true;
+        }
+
+        var ip = HttpContext.Connection.RemoteIpAddress;
+        if (ip != null && System.Net.IPAddress.IsLoopback(ip))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     [HttpPost("status/simulate")]
     public async Task<ActionResult<ApiResponse<StoreStatusDto>>> SimulateStoreStatus([FromBody] SimulateStoreStatusRequest request)
     {
+        if (!IsDevAuthorized())
+        {
+            return Unauthorized(ApiResponse<StoreStatusDto>.Fail("ไม่อนุญาต: ฟังก์ชันจำลองสถานะสำหรับโหมดนักพัฒนาเท่านั้น", ErrorCodes.Unauthorized));
+        }
+
         var tenantCode = string.IsNullOrWhiteSpace(request.StoreCode)
             ? _tenantProvider.CurrentTenantCode
             : request.StoreCode.Trim().ToUpperInvariant();
@@ -203,6 +225,11 @@ public class StoresController : ControllerBase
     [HttpGet("all")]
     public async Task<ActionResult<ApiResponse<List<TenantDto>>>> GetAllStores()
     {
+        if (!IsDevAuthorized())
+        {
+            return Unauthorized(ApiResponse<List<TenantDto>>.Fail("ไม่อนุญาต: ต้องใช้สิทธิ์นักพัฒนาในการเข้าถึงรายชื่อร้านค้า", ErrorCodes.Unauthorized));
+        }
+
         var list = await _tenantService.GetAllTenantsAsync();
         return Ok(ApiResponse<List<TenantDto>>.Ok(list));
     }
@@ -210,6 +237,11 @@ public class StoresController : ControllerBase
     [HttpPost("license/upgrade")]
     public async Task<ActionResult<ApiResponse<TenantDto>>> UpgradeLicense([FromBody] UpgradeLicenseRequest request)
     {
+        if (!IsDevAuthorized())
+        {
+            return Unauthorized(ApiResponse<TenantDto>.Fail("ไม่อนุญาต: ต้องใช้สิทธิ์นักพัฒนาในการอัปเกรดสิทธิ์ร้านค้า", ErrorCodes.Unauthorized));
+        }
+
         try
         {
             var updated = await _tenantService.UpdateTenantLicenseAsync(request.StoreCode, request.Plan, request.ExtendDays);
@@ -252,6 +284,11 @@ public class StoresController : ControllerBase
     [HttpPost("license/generate-key")]
     public ActionResult<ApiResponse<GenerateKeyResponse>> GenerateKey([FromBody] UpgradeLicenseRequest request)
     {
+        if (!IsDevAuthorized())
+        {
+            return Unauthorized(ApiResponse<GenerateKeyResponse>.Fail("ไม่อนุญาต: ต้องใช้สิทธิ์นักพัฒนาในการสร้าง Activation Key", ErrorCodes.Unauthorized));
+        }
+
         try
         {
             if (string.IsNullOrWhiteSpace(request.StoreCode))
@@ -270,6 +307,11 @@ public class StoresController : ControllerBase
     [HttpPost("license/toggle-status")]
     public async Task<ActionResult<ApiResponse<TenantDto>>> ToggleStoreStatus([FromBody] TenantDto request)
     {
+        if (!IsDevAuthorized())
+        {
+            return Unauthorized(ApiResponse<TenantDto>.Fail("ไม่อนุญาต: ต้องใช้สิทธิ์นักพัฒนาในการปรับสถานะร้านค้า", ErrorCodes.Unauthorized));
+        }
+
         try
         {
             var updated = await _tenantService.SetTenantActiveStatusAsync(request.StoreCode, request.IsActive);

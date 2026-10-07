@@ -7,7 +7,7 @@ import {
   getStoredUser, uploadProductImage, getIngredients, createIngredient,
   updateIngredient, deleteIngredient, adjustIngredientStock, getAuditLogs,
   getStoredTenantCode, setStoredTenantCode, getStoreInfo, registerStore, checkStore,
-  simulateStoreStatus
+  simulateStoreStatus, isDevUnlocked, unlockDevMode, lockDevMode
 } from './services/api';
 import type { 
   CategoryItem, ProductItem, IngredientItem, Order, CreateOrderPayload, 
@@ -51,6 +51,66 @@ export function App() {
   });
   const [showDeveloperLicenseModal, setShowDeveloperLicenseModal] = useState<boolean>(false);
   const [showActivateLicenseModal, setShowActivateLicenseModal] = useState<boolean>(false);
+
+  // Developer Mode States & Access Control
+  const [isDevMode, setIsDevMode] = useState<boolean>(() => isDevUnlocked());
+  const [showDevAuthModal, setShowDevAuthModal] = useState<boolean>(false);
+  const [devAuthPin, setDevAuthPin] = useState<string>('');
+  const [devAuthError, setDevAuthError] = useState<string>('');
+  const [, setVersionClickCount] = useState<number>(0);
+
+  // Keyboard shortcut listener (Ctrl+Alt+D or Ctrl+Shift+D) and URL param detection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.altKey || e.shiftKey) && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        if (isDevMode) {
+          lockDevMode();
+          setIsDevMode(false);
+        } else {
+          setShowDevAuthModal(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      if ((p.get('dev') === '1' || p.get('dev') === 'true' || p.get('mode') === 'dev') && !isDevUnlocked()) {
+        setShowDevAuthModal(true);
+      }
+    }
+
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDevMode]);
+
+  const handleEasterEggClick = () => {
+    setVersionClickCount(prev => {
+      const next = prev + 1;
+      if (next >= 5) {
+        setShowDevAuthModal(true);
+        return 0;
+      }
+      return next;
+    });
+  };
+
+  const handleVerifyDevPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (unlockDevMode(devAuthPin)) {
+      setIsDevMode(true);
+      setShowDevAuthModal(false);
+      setDevAuthPin('');
+      setDevAuthError('');
+    } else {
+      setDevAuthError('รหัสผ่านนักพัฒนาไม่ถูกต้อง กรุณากรอกใหม่อีกครั้ง');
+    }
+  };
+
+  const handleExitDevMode = () => {
+    lockDevMode();
+    setIsDevMode(false);
+  };
 
   // Check if current visitor has scanned a table QR or opened a direct store link
   const [sessionParams] = useState(() => {
@@ -160,7 +220,11 @@ export function App() {
           <header className="pos-header-portal">
             <div className="pos-header-portal-top">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontWeight: 'bold', fontSize: '17px', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                <span
+                  onClick={handleEasterEggClick}
+                  style={{ fontWeight: 'bold', fontSize: '17px', letterSpacing: '0.5px', whiteSpace: 'nowrap', cursor: 'default', userSelect: 'none' }}
+                  title="RESTAURANT POS"
+                >
                   RESTAURANT POS
                 </span>
                 <span style={{
@@ -211,41 +275,25 @@ export function App() {
                 [ ดูตัวอย่างระบบจริง (Live Demo) ]
               </button>
 
-              <button
-                onClick={() => setShowActivateLicenseModal(true)}
-                style={{
-                  backgroundColor: '#2E7D32',
-                  color: '#FFF',
-                  border: 'none',
-                  padding: '5px 10px',
-                  borderRadius: '4px',
-                  fontSize: '11.5px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-                title="กรอกรหัส Activation Key เพื่อปลดล็อกสิทธิ์ใช้งานร้าน"
-              >
-                [เปิดใช้งานคีย์]
-              </button>
-
-              <button
-                onClick={() => setShowDeveloperLicenseModal(true)}
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.15)',
-                  color: '#FFF',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  padding: '5px 10px',
-                  borderRadius: '4px',
-                  fontSize: '11.5px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-                title="ศูนย์จัดการคีย์และสิทธิ์ร้านค้าทั้งหมด (SuperAdmin)"
-              >
-                [คีย์นักพัฒนา KeyGen]
-              </button>
+              {isDevMode && (
+                <button
+                  onClick={() => setShowDeveloperLicenseModal(true)}
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    color: '#FFD54F',
+                    border: '1px solid rgba(255,255,255,0.4)',
+                    padding: '5px 10px',
+                    borderRadius: '4px',
+                    fontSize: '11.5px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="ศูนย์จัดการคีย์และสิทธิ์ร้านค้าทั้งหมด (SuperAdmin)"
+                >
+                  [คีย์นักพัฒนา KeyGen]
+                </button>
+              )}
 
               <button
                 onClick={() => {
@@ -355,8 +403,8 @@ export function App() {
 
             {/* Row 2: Live Demo Switcher & Navigation Actions (Cleanly separated on mobile, aligned on desktop) */}
             <div className="pos-header-customer-row2">
-              {/* Demo Mode Toggle Button (Shows for DEFAULT store or demo session) */}
-              {(getStoredTenantCode() === 'DEFAULT' || isDemoViewActive) && (
+              {/* Demo Mode Toggle Button (Only visible in DEV Mode) */}
+              {isDevMode && (
                 <button
                   type="button"
                   onClick={handleToggleDemoOnline}
@@ -515,23 +563,25 @@ export function App() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => setShowDeveloperLicenseModal(true)}
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.15)',
-                  color: '#FFD54F',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-                title="ศูนย์จัดการคีย์และสิทธิ์ร้านค้าทั้งหมด (SuperAdmin)"
-              >
-                [คีย์นักพัฒนา KeyGen]
-              </button>
+              {isDevMode && (
+                <button
+                  onClick={() => setShowDeveloperLicenseModal(true)}
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    color: '#FFD54F',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="ศูนย์จัดการคีย์และสิทธิ์ร้านค้าทั้งหมด (SuperAdmin)"
+                >
+                  [คีย์นักพัฒนา KeyGen]
+                </button>
+              )}
               <span style={{ fontSize: '12px', backgroundColor: 'rgba(255,255,255,0.2)', padding: '3px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
                 {currentUser.fullName}
               </span>
@@ -689,6 +739,7 @@ export function App() {
               isStorePosOnline={isStorePosOnline}
               activePosTerminals={activePosTerminals}
               onToggleDemoOnline={handleToggleDemoOnline}
+              isDevMode={isDevMode}
             />
           )}
           {currentUser && activeTab === 'customer' && (
@@ -697,6 +748,7 @@ export function App() {
               isStorePosOnline={isStorePosOnline}
               activePosTerminals={activePosTerminals}
               onToggleDemoOnline={handleToggleDemoOnline}
+              isDevMode={isDevMode}
             />
           )}
           {currentUser && activeTab === 'kitchen' && <KitchenView />}
@@ -712,6 +764,10 @@ export function App() {
               setShowLoginModal(false);
               setPendingTab(null);
             }} 
+            onOpenActivateLicense={() => {
+              setShowLoginModal(false);
+              setShowActivateLicenseModal(true);
+            }}
           />
         )}
 
@@ -778,6 +834,226 @@ export function App() {
             }}
           />
         )}
+
+        {/* Floating Developer Mode Toolbar (Only visible when DEV Mode is active) */}
+        {isDevMode && (
+          <div style={{
+            position: 'fixed',
+            bottom: '16px',
+            right: '16px',
+            backgroundColor: '#0F172A',
+            color: '#FFF',
+            border: '2px solid #F59E0B',
+            borderRadius: '8px',
+            padding: '8px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            zIndex: 9998,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            fontSize: '12px',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{
+                backgroundColor: '#F59E0B',
+                color: '#000',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                fontSize: '11px'
+              }}>
+                [DEV]
+              </span>
+              <span style={{ fontWeight: 'bold', color: '#F8FAFC' }}>
+                โหมดนักพัฒนา
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDeveloperLicenseModal(true)}
+              style={{
+                backgroundColor: '#1E293B',
+                color: '#38BDF8',
+                border: '1px solid #38BDF8',
+                padding: '4px 10px',
+                borderRadius: '4px',
+                fontSize: '11.5px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+              title="เปิดศูนย์จัดการคีย์และสิทธิ์ร้านค้าทั้งหมด"
+            >
+              [ คีย์ KeyGen ]
+            </button>
+
+            <button
+              type="button"
+              onClick={handleToggleDemoOnline}
+              style={{
+                backgroundColor: isStorePosOnline ? '#991B1B' : '#166534',
+                color: '#FFF',
+                border: 'none',
+                padding: '4px 10px',
+                borderRadius: '4px',
+                fontSize: '11.5px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+              title="สลับสถานะร้านเปิด / ร้านปิด สำหรับนำเสนองานขาย"
+            >
+              [ จำลอง: {isStorePosOnline ? 'ร้านปิด' : 'ร้านเปิด'} ]
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExitDevMode}
+              style={{
+                backgroundColor: '#475569',
+                color: '#FFF',
+                border: 'none',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '11.5px',
+                cursor: 'pointer'
+              }}
+              title="ปิดโหมดนักพัฒนาและกลับสู่มุมมองลูกค้าทั่วไป"
+            >
+              [ ปิด DEV ]
+            </button>
+          </div>
+        )}
+
+        {/* Developer Mode PIN Verification Modal */}
+        {showDevAuthModal && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px'
+          }}>
+            <div style={{
+              backgroundColor: '#FFF',
+              borderRadius: '8px',
+              width: '100%',
+              maxWidth: '400px',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                backgroundColor: '#0F172A',
+                color: '#FFF',
+                padding: '12px 18px',
+                fontSize: '15px',
+                fontWeight: 'bold',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '2px solid #F59E0B'
+              }}>
+                <span style={{ color: '#F59E0B' }}>[ ยืนยันสิทธิ์นักพัฒนา (Developer Mode) ]</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDevAuthModal(false);
+                    setDevAuthPin('');
+                    setDevAuthError('');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#FFF',
+                    fontSize: '16px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  [x]
+                </button>
+              </div>
+              <form onSubmit={handleVerifyDevPin} style={{ padding: '20px' }}>
+                <p style={{ fontSize: '13px', color: '#555', marginTop: 0, marginBottom: '14px', lineHeight: '1.5' }}>
+                  ส่วนนี้สำหรับทีมพัฒนาซอฟต์แวร์และผู้ดูแลระบบเท่านั้น กรุณากรอกรหัสผ่านเพื่อเปิดใช้งานโหมดนักพัฒนา
+                </p>
+                {devAuthError && (
+                  <div style={{
+                    backgroundColor: '#FFEBEE',
+                    color: '#C62828',
+                    border: '1px solid #FFCDD2',
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    fontSize: '12.5px',
+                    marginBottom: '12px',
+                    fontWeight: 'bold'
+                  }}>
+                    {devAuthError}
+                  </div>
+                )}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 'bold', marginBottom: '6px', color: '#333' }}>
+                    รหัสผ่านนักพัฒนา (Developer PIN):
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="กรอกรหัสผ่านนักพัฒนา..."
+                    value={devAuthPin}
+                    onChange={(e) => setDevAuthPin(e.target.value)}
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '4px',
+                      border: '1px solid #CCC',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDevAuthModal(false);
+                      setDevAuthPin('');
+                      setDevAuthError('');
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '9px',
+                      borderRadius: '4px',
+                      border: '1px solid #CCC',
+                      backgroundColor: '#F5F5F5',
+                      fontWeight: 'bold',
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      flex: 1,
+                      padding: '9px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      backgroundColor: '#0F172A',
+                      color: '#F59E0B',
+                      fontWeight: 'bold',
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ยืนยันรหัสผ่าน
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
 
     </ErrorBoundary>
@@ -798,13 +1074,15 @@ interface CustomerViewProps {
   isStorePosOnline?: boolean;
   activePosTerminals?: number;
   onToggleDemoOnline?: () => void;
+  isDevMode?: boolean;
 }
 
 function CustomerView({
   storeInfo: propStoreInfo,
   isStorePosOnline: propIsStorePosOnline = true,
   activePosTerminals: _propActivePosTerminals = 0,
-  onToggleDemoOnline
+  onToggleDemoOnline,
+  isDevMode = false
 }: CustomerViewProps) {
   const [sessionParams] = useState(() => {
     if (typeof window === 'undefined') return { isCustomer: false, store: '', table: '', type: '' };
@@ -1252,8 +1530,8 @@ function CustomerView({
             </div>
           </div>
 
-          {/* Interactive Demo Pitching Toggle (Visible for DEFAULT / demo store) */}
-          {(getStoredTenantCode() === 'DEFAULT' || (typeof window !== 'undefined' && window.location.search.includes('demo'))) && onToggleDemoOnline && (
+          {/* Interactive Demo Pitching Toggle (Visible only in DEV Mode) */}
+          {isDevMode && onToggleDemoOnline && (
             <div style={{
               backgroundColor: '#F8FAFC',
               border: '1px dashed #94A3B8',
@@ -4890,9 +5168,10 @@ interface LoginModalProps {
   initialStoreCode?: string;
   onSuccess: (user: AuthUser) => void;
   onClose: () => void;
+  onOpenActivateLicense?: () => void;
 }
 
-function LoginModal({ initialStoreCode, onSuccess, onClose }: LoginModalProps) {
+function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicense }: LoginModalProps) {
   const [storeCode, setStoreCode] = useState<string>(() => initialStoreCode || getStoredTenantCode());
   const [username, setUsername] = useState<string>('admin');
   const [password, setPassword] = useState<string>('123456');
@@ -5039,6 +5318,25 @@ function LoginModal({ initialStoreCode, onSuccess, onClose }: LoginModalProps) {
               {isLoggingIn ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
             </button>
           </div>
+
+          {onOpenActivateLicense && (
+            <div style={{ textAlign: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #EEE' }}>
+              <button
+                type="button"
+                onClick={onOpenActivateLicense}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#2E7D32',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                [ มีรหัส Activation Key? คลิกเพื่อเปิดใช้งานสิทธิ์ร้านค้า ]
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

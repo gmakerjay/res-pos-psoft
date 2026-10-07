@@ -4,6 +4,8 @@ import {
   upgradeStoreLicense,
   generateLicenseKey,
   toggleStoreStatus,
+  isDevUnlocked,
+  unlockDevMode,
   type TenantItem,
   type GenerateKeyResponse
 } from '../services/api';
@@ -14,6 +16,9 @@ interface DeveloperLicensePortalModalProps {
 }
 
 export function DeveloperLicensePortalModal({ isOpen, onClose }: DeveloperLicensePortalModalProps) {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => isDevUnlocked());
+  const [inputPin, setInputPin] = useState<string>('');
+  const [authError, setAuthError] = useState<string>('');
   const [stores, setStores] = useState<TenantItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,9 +34,27 @@ export function DeveloperLicensePortalModal({ isOpen, onClose }: DeveloperLicens
 
   useEffect(() => {
     if (isOpen) {
-      loadStores();
+      if (isDevUnlocked()) {
+        setIsAuthenticated(true);
+        loadStores();
+      } else {
+        setIsAuthenticated(false);
+        setInputPin('');
+        setAuthError('');
+      }
     }
   }, [isOpen]);
+
+  const handleVerifyPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (unlockDevMode(inputPin)) {
+      setIsAuthenticated(true);
+      setAuthError('');
+      loadStores();
+    } else {
+      setAuthError('รหัสผ่านนักพัฒนาไม่ถูกต้อง กรุณากรอกใหม่อีกครั้ง');
+    }
+  };
 
   const loadStores = async () => {
     setLoading(true);
@@ -109,6 +132,127 @@ export function DeveloperLicensePortalModal({ isOpen, onClose }: DeveloperLicens
   };
 
   if (!isOpen) return null;
+
+  if (!isAuthenticated) {
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '16px'
+      }}>
+        <div style={{
+          backgroundColor: '#FFF',
+          borderRadius: '8px',
+          width: '100%',
+          maxWidth: '420px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            backgroundColor: '#0D47A1',
+            color: '#FFF',
+            padding: '12px 18px',
+            fontSize: '15px',
+            fontWeight: 'bold',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span>[ ยืนยันสิทธิ์นักพัฒนา (Developer PIN) ]</span>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#FFF',
+                fontSize: '16px',
+                cursor: 'pointer'
+              }}
+            >
+              [x]
+            </button>
+          </div>
+          <form onSubmit={handleVerifyPin} style={{ padding: '20px' }}>
+            <p style={{ fontSize: '13px', color: '#555', marginTop: 0, marginBottom: '14px', lineHeight: '1.5' }}>
+              ส่วนนี้สำหรับผู้ดูแลระบบและทีมพัฒนาซอฟต์แวร์เท่านั้น เพื่อความปลอดภัยกรุณากรอกรหัสผ่านนักพัฒนาเพื่อเข้าสู่ศูนย์จัดการคีย์
+            </p>
+            {authError && (
+              <div style={{
+                backgroundColor: '#FFEBEE',
+                color: '#C62828',
+                border: '1px solid #FFCDD2',
+                padding: '8px 12px',
+                borderRadius: '4px',
+                fontSize: '12.5px',
+                marginBottom: '12px',
+                fontWeight: 'bold'
+              }}>
+                {authError}
+              </div>
+            )}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 'bold', marginBottom: '6px', color: '#333' }}>
+                รหัสผ่านนักพัฒนา (Developer PIN):
+              </label>
+              <input
+                type="password"
+                placeholder="กรอกรหัสผ่านนักพัฒนา..."
+                value={inputPin}
+                onChange={(e) => setInputPin(e.target.value)}
+                autoFocus
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '4px',
+                  border: '1px solid #CCC',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  flex: 1,
+                  padding: '9px',
+                  borderRadius: '4px',
+                  border: '1px solid #CCC',
+                  backgroundColor: '#F5F5F5',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                style={{
+                  flex: 1,
+                  padding: '9px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: '#0D47A1',
+                  color: '#FFF',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                ยืนยันรหัสผ่าน
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   const filteredStores = stores.filter(s =>
     s.storeCode.toLowerCase().includes(search.toLowerCase()) ||

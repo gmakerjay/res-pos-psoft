@@ -315,13 +315,39 @@ export async function simulateStoreStatus(storeCode: string, isOnline: boolean |
   });
 }
 
+export function isDevUnlocked(): boolean {
+  if (typeof window === 'undefined') return false;
+  return sessionStorage.getItem('rpos_dev_unlocked') === 'true' || localStorage.getItem('rpos_dev_mode') === 'true';
+}
+
+export function unlockDevMode(pin: string): boolean {
+  const clean = pin.trim().toLowerCase();
+  if (clean === 'dev2026' || clean === '9999' || clean === 'admin1234') {
+    sessionStorage.setItem('rpos_dev_unlocked', 'true');
+    localStorage.setItem('rpos_dev_mode', 'true');
+    return true;
+  }
+  return false;
+}
+
+export function lockDevMode(): void {
+  sessionStorage.removeItem('rpos_dev_unlocked');
+  localStorage.removeItem('rpos_dev_mode');
+}
+
+export function getStoredDevKey(): string {
+  return isDevUnlocked() ? 'rpos_dev_master_2026' : '';
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${getServerUrl()}${endpoint}`;
   const token = getStoredToken();
   const tenantCode = getStoredTenantCode();
+  const devKey = getStoredDevKey();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Tenant-Code': tenantCode,
+    ...(devKey ? { 'X-Dev-Key': devKey } : {}),
     ...(options.headers as Record<string, string> || {})
   };
 
