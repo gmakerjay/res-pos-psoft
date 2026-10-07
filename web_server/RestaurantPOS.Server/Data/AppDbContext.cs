@@ -53,8 +53,54 @@ public class AppDbContext : DbContext
         return Convert.ToBase64String(bytes);
     }
 
-    public void SeedInitialData(string? customAdminUser = null, string? customAdminPassword = null, string? storeName = null)
+    public void SeedInitialData(string? customAdminUser = null, string? customAdminPassword = null, string? storeName = null, bool isDemoStore = false)
     {
+        var adminUsername = string.IsNullOrWhiteSpace(customAdminUser) ? "admin" : customAdminUser.Trim();
+        var adminPassword = string.IsNullOrWhiteSpace(customAdminPassword) ? "psoft123" : customAdminPassword.Trim();
+
+        // 1. Always ensure Admin and Cashier accounts exist so store owner can log in
+        if (!Users.Any())
+        {
+            Users.AddRange(
+                new UserEntity
+                {
+                    Username = adminUsername,
+                    PasswordHash = HashPassword(adminPassword),
+                    FullName = string.IsNullOrWhiteSpace(storeName) ? "ผู้ดูแลระบบ" : $"ผู้ดูแลระบบ {storeName}",
+                    Role = UserRole.SuperAdmin,
+                    IsActive = true,
+                    PermissionsJson = "[\"All\"]"
+                },
+                new UserEntity
+                {
+                    Username = "cashier",
+                    PasswordHash = HashPassword("psoft123"),
+                    FullName = "พนักงานหน้าร้าน",
+                    Role = UserRole.Cashier,
+                    IsActive = true,
+                    PermissionsJson = "[\"ViewPOS\",\"CreateOrder\",\"EditOrder\",\"Payment\"]"
+                }
+            );
+            SaveChanges();
+        }
+        else
+        {
+            var adminUser = Users.FirstOrDefault(u => u.Username == adminUsername);
+            if (adminUser != null && !string.IsNullOrWhiteSpace(customAdminPassword))
+            {
+                adminUser.PasswordHash = HashPassword(adminPassword);
+                adminUser.IsActive = true;
+                SaveChanges();
+            }
+        }
+
+        // If this is NOT a demo store (e.g. newly registered real store), keep the store 100% clean and empty!
+        if (!isDemoStore)
+        {
+            return;
+        }
+
+        // 2. Demo Store Only (DEFAULT): Seed Tables, Categories, Sample Menu, and Ingredients
         if (!Tables.Any())
         {
             var tables = new List<TableEntity>();
@@ -154,44 +200,6 @@ public class AppDbContext : DbContext
         if (updatedAnyImage)
         {
             SaveChanges();
-        }
-
-        var adminUsername = string.IsNullOrWhiteSpace(customAdminUser) ? "admin" : customAdminUser.Trim();
-        var adminPassword = string.IsNullOrWhiteSpace(customAdminPassword) ? "psoft123" : customAdminPassword.Trim();
-
-        if (!Users.Any())
-        {
-            Users.AddRange(
-                new UserEntity
-                {
-                    Username = adminUsername,
-                    PasswordHash = HashPassword(adminPassword),
-                    FullName = string.IsNullOrWhiteSpace(storeName) ? "ผู้ดูแลระบบ" : $"ผู้ดูแลระบบ {storeName}",
-                    Role = UserRole.SuperAdmin,
-                    IsActive = true,
-                    PermissionsJson = "[\"All\"]"
-                },
-                new UserEntity
-                {
-                    Username = "cashier",
-                    PasswordHash = HashPassword("psoft123"),
-                    FullName = "พนักงานหน้าร้าน",
-                    Role = UserRole.Cashier,
-                    IsActive = true,
-                    PermissionsJson = "[\"ViewPOS\",\"CreateOrder\",\"EditOrder\",\"Payment\"]"
-                }
-            );
-            SaveChanges();
-        }
-        else
-        {
-            var adminUser = Users.FirstOrDefault(u => u.Username == adminUsername);
-            if (adminUser != null && !string.IsNullOrWhiteSpace(customAdminPassword))
-            {
-                adminUser.PasswordHash = HashPassword(adminPassword);
-                adminUser.IsActive = true;
-                SaveChanges();
-            }
         }
 
         // Seed Raw Materials (Ingredients / สต๊อกวัตถุดิบ)

@@ -105,7 +105,7 @@ public class TenantService : ITenantService
         using var defaultDb = CreateTenantDbContext("DEFAULT");
         await defaultDb.Database.EnsureCreatedAsync();
         try { await defaultDb.Database.ExecuteSqlRawAsync("ALTER TABLE Orders ADD COLUMN TableNumber TEXT;"); } catch { }
-        defaultDb.SeedInitialData("admin", "psoft123", "ร้านหลัก");
+        defaultDb.SeedInitialData("admin", "psoft123", "ร้านหลัก", isDemoStore: true);
     }
 
     public async Task<TenantEntity?> GetTenantAsync(string storeCode)
@@ -189,7 +189,7 @@ public class TenantService : ITenantService
         {
             await tenantDb.Database.EnsureCreatedAsync();
             try { await tenantDb.Database.ExecuteSqlRawAsync("ALTER TABLE Orders ADD COLUMN TableNumber TEXT;"); } catch { }
-            tenantDb.SeedInitialData(adminUser, adminPass, tenant.StoreName);
+            tenantDb.SeedInitialData(adminUser, adminPass, tenant.StoreName, isDemoStore: false);
             _logger.LogInformation("[Tenancy] Successfully initialized isolated database for store: {StoreCode}", code);
         }
 

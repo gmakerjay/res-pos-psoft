@@ -740,6 +740,10 @@ export function App() {
               activePosTerminals={activePosTerminals}
               onToggleDemoOnline={handleToggleDemoOnline}
               isDevMode={isDevMode}
+              onOpenLogin={() => {
+                setLoginModalStoreCode(getStoredTenantCode() || 'DEFAULT');
+                setShowLoginModal(true);
+              }}
             />
           )}
           {currentUser && activeTab === 'customer' && (
@@ -749,6 +753,10 @@ export function App() {
               activePosTerminals={activePosTerminals}
               onToggleDemoOnline={handleToggleDemoOnline}
               isDevMode={isDevMode}
+              onOpenLogin={() => {
+                setLoginModalStoreCode(getStoredTenantCode() || 'DEFAULT');
+                setShowLoginModal(true);
+              }}
             />
           )}
           {currentUser && activeTab === 'kitchen' && <KitchenView />}
@@ -1075,6 +1083,7 @@ interface CustomerViewProps {
   activePosTerminals?: number;
   onToggleDemoOnline?: () => void;
   isDevMode?: boolean;
+  onOpenLogin?: () => void;
 }
 
 function CustomerView({
@@ -1082,7 +1091,8 @@ function CustomerView({
   isStorePosOnline: propIsStorePosOnline = true,
   activePosTerminals: _propActivePosTerminals = 0,
   onToggleDemoOnline,
-  isDevMode = false
+  isDevMode = false,
+  onOpenLogin
 }: CustomerViewProps) {
   const [sessionParams] = useState(() => {
     if (typeof window === 'undefined') return { isCustomer: false, store: '', table: '', type: '' };
@@ -2127,6 +2137,42 @@ function CustomerView({
         gap: '16px',
         paddingBottom: '80px'
       }}>
+        {filteredProducts.length === 0 && (
+          <div style={{
+            gridColumn: '1 / -1',
+            backgroundColor: '#FFF',
+            border: '2px dashed #CBD5E1',
+            borderRadius: '12px',
+            padding: '40px 20px',
+            textAlign: 'center',
+            color: '#64748B'
+          }}>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>
+              [ ร้านค้านี้ยังไม่มีรายการอาหาร ]
+            </div>
+            <p style={{ fontSize: '13px', maxWidth: '420px', margin: '0 auto 16px auto', lineHeight: '1.6' }}>
+              ร้านค้านี้เพิ่งเปิดใหม่และพร้อมใช้งานแบบ 100% เจ้าของร้านสามารถเข้าสู่ระบบเพื่อเริ่มเพิ่มหมวดหมู่ เมนูอาหาร และกำหนดราคาได้ทันที
+            </p>
+            {onOpenLogin && (
+              <button
+                type="button"
+                onClick={onOpenLogin}
+                style={{
+                  backgroundColor: '#1976D2',
+                  color: '#FFF',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '6px',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                [ เข้าสู่ระบบเพื่อเริ่มเพิ่มเมนูอาหาร ]
+              </button>
+            )}
+          </div>
+        )}
         {filteredProducts.map(p => {
           const imgUrl = resolveImageUrl(p.imageUrl);
           const isSoldOut = !p.isAvailable;
