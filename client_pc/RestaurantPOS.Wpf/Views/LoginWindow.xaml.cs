@@ -17,7 +17,22 @@ public partial class LoginWindow : Window
         _api = api;
         _config = config;
         UpdateSubtitle();
-        Loaded += (s, e) => TxtPassword.Focus();
+        if (string.IsNullOrEmpty(TxtUsername.Text))
+        {
+            TxtUsername.Text = "admin";
+        }
+        if (string.IsNullOrEmpty(TxtPassword.Password))
+        {
+            TxtPassword.Password = "psoft123";
+        }
+        Loaded += (s, e) => BtnLogin.Focus();
+    }
+
+    private void BtnQuickDemo_Click(object sender, RoutedEventArgs e)
+    {
+        TxtUsername.Text = "admin";
+        TxtPassword.Password = "psoft123";
+        BtnLogin_Click(sender, e);
     }
 
     private void UpdateSubtitle()

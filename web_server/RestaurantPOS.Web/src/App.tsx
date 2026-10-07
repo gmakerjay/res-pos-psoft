@@ -5174,9 +5174,33 @@ interface LoginModalProps {
 function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicense }: LoginModalProps) {
   const [storeCode, setStoreCode] = useState<string>(() => initialStoreCode || getStoredTenantCode());
   const [username, setUsername] = useState<string>('admin');
-  const [password, setPassword] = useState<string>('123456');
+  const [password, setPassword] = useState<string>('psoft123');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+
+  const handleQuickDemoLogin = async () => {
+    setIsLoggingIn(true);
+    setErrorMsg('');
+    try {
+      setStoreCode('DEFAULT');
+      setUsername('admin');
+      setPassword('psoft123');
+      setStoredTenantCode('DEFAULT');
+      const res = await login('admin', 'psoft123');
+      onSuccess(res.user);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'ไม่สามารถเข้าสู่ระบบร้านตัวอย่างได้');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleFillDemo = () => {
+    setStoreCode('DEFAULT');
+    setUsername('admin');
+    setPassword('psoft123');
+    setErrorMsg('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -5215,15 +5239,68 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
         padding: '28px',
         borderRadius: '10px',
         width: '90%',
-        maxWidth: '400px',
+        maxWidth: '430px',
         boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
       }}>
-        <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px', color: '#0D47A1' }}>
+        <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '6px', color: '#0D47A1' }}>
           เข้าสู่ระบบร้านค้า (Store Login)
         </h3>
-        <p style={{ fontSize: '12px', color: '#666', marginBottom: '16px' }}>
+        <p style={{ fontSize: '12px', color: '#666', marginBottom: '14px' }}>
           เข้าสู่ระบบเพื่อจัดการเมนูอาหาร สต็อกวัตถุดิบ หรือเข้าใช้งานจอครัว (KDS)
         </p>
+
+        {/* Quick 1-Click Demo Login Box */}
+        <div style={{
+          backgroundColor: '#E8F5E9',
+          border: '1.5px solid #81C784',
+          borderRadius: '8px',
+          padding: '12px 14px',
+          marginBottom: '16px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1B5E20' }}>
+              [ ร้านค้าตัวอย่างระบบ (DEFAULT Demo) ]
+            </span>
+            <button
+              type="button"
+              onClick={handleFillDemo}
+              style={{
+                background: 'none',
+                border: '1px solid #4CAF50',
+                color: '#1B5E20',
+                borderRadius: '4px',
+                padding: '2px 8px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              เติมข้อมูลฟอร์ม
+            </button>
+          </div>
+          <button
+            type="button"
+            disabled={isLoggingIn}
+            onClick={handleQuickDemoLogin}
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              backgroundColor: '#2E7D32',
+              color: '#FFF',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              cursor: isLoggingIn ? 'not-allowed' : 'pointer',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+            }}
+          >
+            {isLoggingIn ? 'กำลังเข้าสู่ระบบ...' : '[ เข้าสู่ระบบร้านตัวอย่างทันที (1-Click Demo Login) ]'}
+          </button>
+          <div style={{ fontSize: '11px', color: '#2E7D32', marginTop: '6px', textAlign: 'center' }}>
+            รหัสเริ่มต้น: ผู้ใช้ <strong>admin</strong> | รหัสผ่าน <strong>psoft123</strong> (หรือ 123456)
+          </div>
+        </div>
 
         {errorMsg && (
           <div style={{
@@ -5242,9 +5319,25 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-              รหัสร้านค้า (Store Code / Security Key):
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600 }}>
+                รหัสร้านค้า (Store Code / Security Key):
+              </label>
+              <button
+                type="button"
+                onClick={() => setStoreCode('DEFAULT')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#1565C0',
+                  fontSize: '11.5px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                [ใช้ DEFAULT]
+              </button>
+            </div>
             <input
               type="text"
               placeholder="เช่น DEFAULT, SHOP1234"
@@ -5261,6 +5354,9 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
                 color: '#1565C0'
               }}
             />
+            <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>
+              * รหัสร้านค้าตัวอย่างคือ <strong>DEFAULT</strong> หรือกรอกรหัสร้านค้าที่คุณสร้างขึ้น
+            </div>
           </div>
 
           <div style={{ marginBottom: '14px' }}>
@@ -5273,6 +5369,9 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
               onChange={(e) => setUsername(e.target.value)}
               style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #CCC', fontSize: '14px' }}
             />
+            <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>
+              * ชื่อผู้ดูแลระบบร้านตัวอย่างคือ <strong>admin</strong>
+            </div>
           </div>
 
           <div style={{ marginBottom: '18px' }}>
@@ -5281,10 +5380,14 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
             </label>
             <input
               type="password"
+              placeholder="psoft123 หรือ 123456"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #CCC', fontSize: '14px' }}
             />
+            <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>
+              * รหัสผ่านร้านตัวอย่างคือ <strong>psoft123</strong> (หรือ <strong>123456</strong> หรือ <strong>admin</strong>)
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
