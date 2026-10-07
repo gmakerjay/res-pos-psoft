@@ -98,3 +98,123 @@ input, select, textarea {
 .animate-fade-in {
   animation: fadeIn 0.25s ease-out forwards;
 }
+
+/* Responsive Headers for Mobile & Tablet */
+.pos-header-portal {
+  background-color: #0D47A1;
+  color: #FFF;
+  padding: 10px 14px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pos-header-portal-top {
+  display: flex;
+  justifyContent: space-between;
+  align-items: center;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pos-header-portal-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+@media (min-width: 860px) {
+  .pos-header-portal {
+    flex-direction: row;
+    justifyContent: space-between;
+    align-items: center;
+    padding: 12px 16px;
+  }
+  .pos-header-portal-top {
+    width: auto;
+  }
+  .pos-header-portal-actions {
+    width: auto;
+    padding-top: 0;
+    border-top: none;
+    margin-left: auto;
+  }
+}
+
+.pos-header-customer {
+  background-color: #0D47A1;
+  color: #FFF;
+  padding: 8px 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pos-header-customer-row1 {
+  display: flex;
+  justifyContent: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.pos-header-customer-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.pos-header-customer-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pos-header-customer-row2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+@media (min-width: 1024px) {
+  .pos-header-customer {
+    flex-direction: row;
+    justifyContent: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    gap: 12px;
+  }
+  .pos-header-customer-row1 {
+    width: auto;
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+  .pos-header-customer-row2 {
+    width: auto;
+    padding-top: 0;
+    border-top: none;
+    margin-left: auto;
+  }
+}

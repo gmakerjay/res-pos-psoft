@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  getTables, getCategories, createCategory, updateCategory, deleteCategory,
+  getCategories, createCategory, updateCategory, deleteCategory,
   getProducts, createProduct, updateProduct, deleteProduct, createOrder, getActiveOrders, 
-  getActiveOrdersByTable,
   updateOrderStatus, getDailyReport, checkServerHealth, login, logout, 
   getStoredUser, uploadProductImage, getIngredients, createIngredient,
   updateIngredient, deleteIngredient, adjustIngredientStock, getAuditLogs,
@@ -10,7 +9,7 @@ import {
   simulateStoreStatus
 } from './services/api';
 import type { 
-  TableItem, CategoryItem, ProductItem, IngredientItem, Order, CreateOrderPayload, 
+  CategoryItem, ProductItem, IngredientItem, Order, CreateOrderPayload, 
   AuthUser, AuditLogItem, StoreInfo
 } from './services/api';
 import { realtimeService } from './services/realtime';
@@ -157,34 +156,24 @@ export function App() {
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', width: '100%', overflowX: 'hidden' }}>
         {/* Case 1: Software Portal Header (When NOT logged in and on Root Domain without QR/store params) */}
         {!currentUser && !isCustomerSession && (
-          <header style={{
-            backgroundColor: '#0D47A1',
-            color: '#FFF',
-            padding: '12px 16px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-            width: '100%',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontWeight: 'bold', fontSize: '18px', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
-                RESTAURANT POS
-              </span>
-              <span style={{
-                fontSize: '11px',
-                background: 'rgba(255,255,255,0.2)',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                whiteSpace: 'nowrap'
-              }}>
-                ระบบจัดการร้านอาหาร
-              </span>
-            </div>
+          <header className="pos-header-portal">
+            <div className="pos-header-portal-top">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: 'bold', fontSize: '17px', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                  RESTAURANT POS
+                </span>
+                <span style={{
+                  fontSize: '11px',
+                  background: 'rgba(255,255,255,0.2)',
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  whiteSpace: 'nowrap'
+                }}>
+                  ระบบจัดการร้านอาหาร
+                </span>
+              </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', whiteSpace: 'nowrap' }}>
                 <span style={{
                   width: '8px',
                   height: '8px',
@@ -195,7 +184,9 @@ export function App() {
                   {connectionState === 'connected' ? '[Online]' : (connectionState === 'reconnecting' ? '[Reconnecting]' : '[Offline]')}
                 </span>
               </div>
+            </div>
 
+            <div className="pos-header-portal-actions">
               <button
                 onClick={() => {
                   setStoredTenantCode('DEFAULT');
@@ -206,9 +197,9 @@ export function App() {
                   backgroundColor: '#FFD54F',
                   color: '#0D47A1',
                   border: 'none',
-                  padding: '7px 14px',
+                  padding: '6px 12px',
                   borderRadius: '4px',
-                  fontSize: '12.5px',
+                  fontSize: '12px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
@@ -225,9 +216,9 @@ export function App() {
                   backgroundColor: '#2E7D32',
                   color: '#FFF',
                   border: 'none',
-                  padding: '6px 12px',
+                  padding: '5px 10px',
                   borderRadius: '4px',
-                  fontSize: '12px',
+                  fontSize: '11.5px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap'
@@ -243,9 +234,9 @@ export function App() {
                   backgroundColor: 'rgba(255,255,255,0.15)',
                   color: '#FFF',
                   border: '1px solid rgba(255,255,255,0.3)',
-                  padding: '6px 12px',
+                  padding: '5px 10px',
                   borderRadius: '4px',
-                  fontSize: '12px',
+                  fontSize: '11.5px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap'
@@ -264,9 +255,9 @@ export function App() {
                   backgroundColor: 'rgba(255,255,255,0.15)',
                   color: '#FFF',
                   border: '1px solid rgba(255,255,255,0.4)',
-                  padding: '6px 14px',
+                  padding: '5px 12px',
                   borderRadius: '4px',
-                  fontSize: '12px',
+                  fontSize: '11.5px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap'
@@ -280,83 +271,89 @@ export function App() {
 
         {/* Case 2: Customer Ordering Header (When customer visits via QR code or direct store link) */}
         {!currentUser && isCustomerSession && (
-          <header style={{
-            backgroundColor: '#0D47A1',
-            color: '#FFF',
-            padding: '10px 14px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-            width: '100%',
-            position: 'sticky',
-            top: 0,
-            zIndex: 100,
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-              <a
-                href="/"
-                style={{
-                  color: '#FFF',
-                  textDecoration: 'none',
-                  fontWeight: 'bold',
-                  fontSize: '14px',
-                  whiteSpace: 'nowrap'
-                }}
-                title="กลับหน้าหลักซอฟต์แวร์"
-              >
-                POS
-              </a>
-              <span style={{
-                backgroundColor: '#1565C0',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                color: '#FFEB3B',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                maxWidth: '220px'
-              }}>
-                [ร้าน: {storeInfo ? storeInfo.storeName : (getStoredTenantCode() === 'DEFAULT' ? 'ร้านอาหารตัวอย่าง (สาขาหลัก)' : getStoredTenantCode())}]
-              </span>
-              <span style={{
-                backgroundColor: '#2E7D32',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                whiteSpace: 'nowrap'
-              }}>
-                {sessionParams.type === 'takeaway' ? 'สั่งกลับบ้าน' : `โต๊ะ ${sessionParams.table || 'T01'}`}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              {/* Real-Time Client PC (POS) Presence Badge */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                backgroundColor: isStorePosOnline ? '#2E7D32' : '#C62828',
-                color: '#FFF',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                fontWeight: 'bold',
-                whiteSpace: 'nowrap'
-              }}>
+          <header className="pos-header-customer">
+            {/* Row 1: Brand & Table Context + Live Server/Store Status */}
+            <div className="pos-header-customer-row1">
+              <div className="pos-header-customer-brand">
+                <a
+                  href="/"
+                  style={{
+                    color: '#FFF',
+                    textDecoration: 'none',
+                    fontWeight: 'bold',
+                    fontSize: '13.5px',
+                    whiteSpace: 'nowrap',
+                    padding: '2px 6px',
+                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    borderRadius: '4px'
+                  }}
+                  title="กลับหน้าหลักซอฟต์แวร์"
+                >
+                  POS
+                </a>
                 <span style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  backgroundColor: '#FFF'
-                }} />
-                <span>{isStorePosOnline ? '[หน้าร้าน: เปิดรับออเดอร์]' : '[หน้าร้าน: ยังไม่เปิดรับออเดอร์]'}</span>
+                  backgroundColor: '#1565C0',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11.5px',
+                  fontWeight: 'bold',
+                  color: '#FFEB3B',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: '180px'
+                }}>
+                  [ร้าน: {storeInfo ? storeInfo.storeName : (getStoredTenantCode() === 'DEFAULT' ? 'ร้านอาหารตัวอย่าง (สาขาหลัก)' : getStoredTenantCode())}]
+                </span>
+                <span style={{
+                  backgroundColor: '#2E7D32',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11.5px',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {sessionParams.type === 'takeaway' ? 'สั่งกลับบ้าน' : (sessionParams.table ? `โต๊ะ ${sessionParams.table}` : 'สั่งออนไลน์')}
+                </span>
               </div>
 
+              <div className="pos-header-customer-status">
+                {/* Real-Time Client PC (POS) Presence Badge */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  backgroundColor: isStorePosOnline ? '#2E7D32' : '#C62828',
+                  color: '#FFF',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap'
+                }}>
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FFF'
+                  }} />
+                  <span>{isStorePosOnline ? '[หน้าร้าน: เปิดรับออเดอร์]' : '[หน้าร้าน: ยังไม่เปิดรับออเดอร์]'}</span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <span style={{
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    backgroundColor: connectionState === 'connected' ? '#00E676' : '#FF5252'
+                  }} />
+                  <span style={{ opacity: 0.85 }}>{connectionState === 'connected' ? '[Server: Online]' : '[Server: Offline]'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Row 2: Live Demo Switcher & Navigation Actions (Cleanly separated on mobile, aligned on desktop) */}
+            <div className="pos-header-customer-row2">
               {/* Demo Mode Toggle Button (Shows for DEFAULT store or demo session) */}
               {(getStoredTenantCode() === 'DEFAULT' || isDemoViewActive) && (
                 <button
@@ -379,16 +376,6 @@ export function App() {
                 </button>
               )}
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', whiteSpace: 'nowrap' }}>
-                <span style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  backgroundColor: connectionState === 'connected' ? '#00E676' : '#FF5252'
-                }} />
-                <span style={{ opacity: 0.85 }}>{connectionState === 'connected' ? '[Server: Online]' : '[Server: Offline]'}</span>
-              </div>
-
               <button
                 type="button"
                 onClick={() => {
@@ -399,9 +386,9 @@ export function App() {
                   backgroundColor: 'rgba(255,255,255,0.18)',
                   color: '#FFF',
                   border: '1px solid rgba(255,255,255,0.4)',
-                  padding: '5px 10px',
+                  padding: '4px 8px',
                   borderRadius: '4px',
-                  fontSize: '11.5px',
+                  fontSize: '11px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap'
@@ -421,12 +408,12 @@ export function App() {
                   backgroundColor: '#FFEB3B',
                   color: '#0D47A1',
                   border: 'none',
-                  padding: '5px 12px',
+                  padding: '4px 10px',
                   borderRadius: '4px',
-                  fontSize: '11.5px',
+                  fontSize: '11px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
                   whiteSpace: 'nowrap'
                 }}
                 title="กลับสู่หน้าหลักแนะนำซอฟต์แวร์และลงทะเบียนร้านค้า"
@@ -837,12 +824,14 @@ function CustomerView({
     return () => unsub();
   }, []);
 
-  const [tables, setTables] = useState<TableItem[]>([]);
+  const [isReservation, setIsReservation] = useState<boolean>(false);
+  const [reservationInfo, setReservationInfo] = useState<string>('');
+
   const [selectedTable, setSelectedTable] = useState<string>(() => {
-    if (typeof window === 'undefined') return 'T01';
+    if (typeof window === 'undefined') return 'ออนไลน์';
     const p = new URLSearchParams(window.location.search);
     if (p.get('type') === 'takeaway') return 'กลับบ้าน';
-    return p.get('table') || 'T01';
+    return p.get('table') || 'ออนไลน์';
   });
 
   const [customerName, setCustomerName] = useState<string>('');
@@ -854,8 +843,30 @@ function CustomerView({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCartDrawer, setShowCartDrawer] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
-  const [tableOrders, setTableOrders] = useState<Order[]>([]);
+
+  // Active order stored per tenant so only THIS browser session sees its own order status
+  const [activeOrder, setActiveOrder] = useState<Order | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const code = getStoredTenantCode() || 'DEFAULT';
+      const saved = localStorage.getItem(`rpos_my_order_${code}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const updateMyActiveOrder = (order: Order | null) => {
+    setActiveOrder(order);
+    try {
+      const code = getStoredTenantCode() || 'DEFAULT';
+      if (order && order.status < 5) {
+        localStorage.setItem(`rpos_my_order_${code}`, JSON.stringify(order));
+      } else {
+        localStorage.removeItem(`rpos_my_order_${code}`);
+      }
+    } catch {}
+  };
 
   // Modal for customizing item notes before adding
   const [itemToCustom, setItemToCustom] = useState<ProductItem | null>(null);
@@ -880,31 +891,16 @@ function CustomerView({
       setSelectedTable('กลับบ้าน');
     } else if (tableParam) {
       setSelectedTable(tableParam);
+    } else {
+      setSelectedTable('ออนไลน์');
     }
   }, []);
-
-
-  const loadTableOrders = async (tbl: string) => {
-    if (!tbl) return;
-    try {
-      const orders = await getActiveOrdersByTable(tbl);
-      setTableOrders(orders);
-    } catch {
-      setTableOrders([]);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedTable) {
-      loadTableOrders(selectedTable);
-    }
-  }, [selectedTable]);
 
   // Fetch tables and menu
   useEffect(() => {
     loadData();
 
-    // Listen to real-time order status updates for active order
+    // Listen to real-time order status updates strictly for THIS customer's active order
     const unsubOrder = realtimeService.onOrderStatusChanged((updated) => {
       setActiveOrder((prev) => {
         if (prev && prev.id === updated.id) {
@@ -912,27 +908,24 @@ function CustomerView({
           if (prev.status !== 4 && updated.status === 4) {
             playOrderReadyChime();
           }
-          return updated;
+          const next = { ...prev, status: updated.status };
+          try {
+            const code = getStoredTenantCode() || 'DEFAULT';
+            localStorage.setItem(`rpos_my_order_${code}`, JSON.stringify(next));
+          } catch {}
+          return next;
         }
         return prev;
       });
-      if (selectedTable) {
-        loadTableOrders(selectedTable);
-      }
-    });
-
-    const unsubNewOrder = realtimeService.onOrderCreated(() => {
-      if (selectedTable) {
-        loadTableOrders(selectedTable);
-      }
     });
 
     const unsubBillClosed = realtimeService.onBillClosed((closedOrder) => {
-      if (selectedTable) {
-        loadTableOrders(selectedTable);
-      }
       setActiveOrder((prev) => {
-        if (prev && (prev.id === closedOrder.id || prev.tableNumber === closedOrder.tableNumber)) {
+        if (prev && prev.id === closedOrder.id) {
+          try {
+            const code = getStoredTenantCode() || 'DEFAULT';
+            localStorage.removeItem(`rpos_my_order_${code}`);
+          } catch {}
           return { ...prev, status: 5 };
         }
         return prev;
@@ -949,21 +942,18 @@ function CustomerView({
 
     return () => {
       unsubOrder();
-      unsubNewOrder();
       unsubBillClosed();
       unsubMenu();
       unsubCat();
     };
-  }, [selectedTable]);
+  }, []);
 
   const loadData = async () => {
     try {
-      const [tList, cList, pList] = await Promise.all([
-        getTables(),
+      const [cList, pList] = await Promise.all([
         getCategories(),
         getProducts()
       ]);
-      setTables(tList);
       setCategories(cList);
       setProducts(pList);
     } catch (err: any) {
@@ -1022,13 +1012,22 @@ function CustomerView({
     }
     setIsSubmitting(true);
     try {
-      const isTakeaway = selectedTable === 'กลับบ้าน' || sessionParams.type === 'takeaway';
+      const isTakeaway = !sessionParams.table && !isReservation;
+      const finalTableNumber = sessionParams.table 
+        ? sessionParams.table 
+        : (isReservation ? 'จองโต๊ะ' : 'ออนไลน์');
+
+      let combinedNotes = notes ? notes.trim() : '';
+      if (isReservation && reservationInfo.trim()) {
+        combinedNotes = `[จองโต๊ะ: ${reservationInfo.trim()}] ${combinedNotes}`.trim();
+      }
+
       const payload: CreateOrderPayload = {
         type: isTakeaway ? 2 : 1, // 1=DineIn, 2=TakeAway
-        tableNumber: isTakeaway ? 'กลับบ้าน' : selectedTable,
+        tableNumber: finalTableNumber,
         customerName: customerName.trim() || undefined,
         customerPhone: phone || undefined,
-        notes: notes || undefined,
+        notes: combinedNotes || undefined,
         clientRequestId: `WEB-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
 
         items: cart.map(i => ({
@@ -1039,12 +1038,11 @@ function CustomerView({
       };
 
       const newOrder = await createOrder(payload);
-      setActiveOrder(newOrder);
+      updateMyActiveOrder(newOrder);
       setCart([]);
       setShowCartDrawer(false);
       setShowConfirmModal(false);
-      await loadTableOrders(selectedTable);
-      alert(`สั่งอาหารเรียบร้อยแล้ว!\nเลขที่ออเดอร์: ${newOrder.orderNumber}\nทางร้านได้รับคำสั่งซื้อและข้อมูลยืนยันเรียบร้อยแล้ว`);
+      alert(`สั่งอาหารเรียบร้อยแล้ว!\nเลขที่ออเดอร์: ${newOrder.orderNumber}\nระบบได้ส่งออเดอร์ไปยังเครื่องหลักหน้าร้านเรียบร้อยแล้ว`);
     } catch (err: any) {
       alert('ไม่สามารถส่งออเดอร์ได้: ' + err.message);
     } finally {
@@ -1204,32 +1202,7 @@ function CustomerView({
         width: '100%'
       }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', width: '100%' }}>
-          {selectedTable === 'กลับบ้าน' || sessionParams.type === 'takeaway' ? (
-            <div style={{
-              flex: '1 1 200px',
-              backgroundColor: '#FFF3E0',
-              border: '1.5px solid #FF9800',
-              padding: '6px 12px',
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <span style={{
-                backgroundColor: '#E65100',
-                color: '#FFF',
-                padding: '2px 8px',
-                borderRadius: '10px',
-                fontSize: '11.5px',
-                fontWeight: 'bold'
-              }}>
-                [ สั่งกลับบ้าน / Takeaway ]
-              </span>
-              <span style={{ fontSize: '12px', color: '#BF360C', fontWeight: 'bold' }}>
-                สั่งล่วงหน้า และมารับที่ร้าน
-              </span>
-            </div>
-          ) : sessionParams.table ? (
+          {sessionParams.table ? (
             <div style={{
               flex: '1 1 180px',
               backgroundColor: '#E8F5E9',
@@ -1248,40 +1221,58 @@ function CustomerView({
                 fontSize: '11.5px',
                 fontWeight: 'bold'
               }}>
-                [ โต๊ะอาหาร: {selectedTable} ]
+                [ โต๊ะอาหาร: {sessionParams.table} ]
               </span>
               <span style={{ fontSize: '12px', color: '#1B5E20' }}>
                 สั่งประจำโต๊ะนี้
               </span>
             </div>
           ) : (
-            <div style={{ flex: '1 1 120px', minWidth: '100px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '2px', color: '#555' }}>
-                โต๊ะที่นั่ง / รูปแบบ:
-              </label>
-              <select
-                value={selectedTable}
-                onChange={(e) => setSelectedTable(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  borderRadius: '4px',
-                  border: '1px solid #7F9DB9',
-                  fontWeight: 'bold',
-                  fontSize: '13.5px',
-                  backgroundColor: '#F9F9F9'
-                }}
-              >
-                <option value="กลับบ้าน">[ สั่งกลับบ้าน / Takeaway ]</option>
-                {tables.map(t => (
-                  <option key={t.id} value={t.tableNumber}>
-                    {t.tableNumber} ({t.name})
-                  </option>
-                ))}
-              </select>
+            <div style={{
+              flex: '1 1 240px',
+              backgroundColor: isReservation ? '#EFF6FF' : '#FFF7ED',
+              border: isReservation ? '1.5px solid #3B82F6' : '1.5px solid #F97316',
+              padding: '8px 12px',
+              borderRadius: '6px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{
+                  backgroundColor: isReservation ? '#1D4ED8' : '#C2410C',
+                  color: '#FFF',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  fontSize: '11.5px',
+                  fontWeight: 'bold'
+                }}>
+                  {isReservation ? '[ จองโต๊ะทานที่ร้านล่วงหน้า ]' : '[ สั่งออนไลน์ / Takeaway ]'}
+                </span>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={isReservation}
+                    onChange={(e) => setIsReservation(e.target.checked)}
+                    style={{ width: '15px', height: '15px', cursor: 'pointer' }}
+                  />
+                  ต้องการจองโต๊ะล่วงหน้า
+                </label>
+              </div>
+              {isReservation ? (
+                <div style={{ marginTop: '6px' }}>
+                  <input
+                    type="text"
+                    placeholder="ระบุจำนวนท่าน และเวลาที่ต้องการจอง (เช่น 4 ท่าน เวลา 18:30 น.)"
+                    value={reservationInfo}
+                    onChange={(e) => setReservationInfo(e.target.value)}
+                    style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #93C5FD', fontSize: '12px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              ) : (
+                <div style={{ fontSize: '11px', color: '#9A3412', marginTop: '3px' }}>
+                  สั่งซื้อกลับบ้าน / ล่วงหน้า กรุณาระบุเบอร์โทรเพื่อให้ทางร้านติดต่อแจ้งสถานะ
+                </div>
+              )}
             </div>
           )}
-
 
           <div style={{ flex: '1 1 130px', minWidth: '120px' }}>
             <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '2px', color: '#555' }}>
@@ -1324,11 +1315,11 @@ function CustomerView({
 
           <div style={{ flex: '2 1 160px', minWidth: '140px' }}>
             <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '2px', color: '#555' }}>
-              หมายเหตุของโต๊ะ (ไม่บังคับ):
+              หมายเหตุเพิ่มเติม (ไม่บังคับ):
             </label>
             <input
               type="text"
-              placeholder="เช่น ขอจานเพิ่ม 3 ใบ"
+              placeholder="เช่น เวลามารับอาหาร หรือคำแนะนำพิเศษ"
               value={tableNotes}
               onChange={(e) => setTableNotes(e.target.value)}
               style={{
@@ -1348,7 +1339,8 @@ function CustomerView({
             border: '1px solid #81C784',
             padding: '8px 14px',
             borderRadius: '6px',
-            textAlign: 'right'
+            textAlign: 'right',
+            marginTop: '10px'
           }}>
             <div style={{ fontSize: '11px', color: '#2E7D32', fontWeight: 'bold' }}>
               ออเดอร์ล่าสุด #{activeOrder.orderNumber}
@@ -1359,75 +1351,6 @@ function CustomerView({
           </div>
         )}
       </div>
-
-      {/* Existing Table Orders Summary Card (Shows previous orders & status for current table) */}
-      {tableOrders.length > 0 && (
-        <div style={{
-          backgroundColor: '#FFFBEB',
-          border: '1.5px solid #FCD34D',
-          borderRadius: '8px',
-          padding: '16px 20px',
-          marginBottom: '16px',
-          boxShadow: 'var(--shadow)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{
-                backgroundColor: '#D97706',
-                color: '#FFF',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: 'bold'
-              }}>
-                [รายการที่สั่งไปแล้วของโต๊ะ {selectedTable}]
-              </span>
-              <span style={{ fontSize: '13px', color: '#78350F', fontWeight: 600 }}>
-                {tableOrders.length} บิล ({tableOrders.reduce((acc, o) => acc + o.items.reduce((sum, i) => sum + i.quantity, 0), 0)} รายการ)
-              </span>
-            </div>
-            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#92400E' }}>
-              ยอดรวมสะสม: {tableOrders.reduce((sum, o) => sum + o.subtotal, 0).toFixed(2)} บาท
-            </div>
-          </div>
-
-          <div style={{
-            backgroundColor: '#FFF',
-            border: '1px solid #FEF3C7',
-            borderRadius: '6px',
-            padding: '10px',
-            maxHeight: '160px',
-            overflowY: 'auto',
-            marginBottom: '10px'
-          }}>
-            {tableOrders.map(order => (
-              <div key={order.id} style={{ marginBottom: '8px', borderBottom: '1px dashed #FDE68A', paddingBottom: '6px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#666', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: 'bold' }}>บิล #{order.orderNumber} ({getStatusText(order.status)})</span>
-                  <span>{new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-                {order.items.map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '2px 0' }}>
-                    <div>
-                      <span style={{ fontWeight: 600, color: '#1F2937' }}>{item.productName}</span>
-                      <span style={{ color: '#2563EB', fontWeight: 'bold', marginLeft: '6px' }}>x{item.quantity}</span>
-                      {item.specialNotes && (
-                        <span style={{ color: '#6B7280', fontSize: '11.5px', marginLeft: '8px' }}>({item.specialNotes})</span>
-                      )}
-                    </div>
-                    <span style={{ fontWeight: 'bold', color: '#4B5563' }}>{item.subtotal.toFixed(2)} บ.</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-
-          <div style={{ fontSize: '12.5px', color: '#92400E', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
-            <span>ท่านสามารถเลือกรายการเมนูด้านล่างและกดสั่งอาหารเพิ่มเข้าโต๊ะนี้ได้ตลอดเวลา</span>
-            <span style={{ fontWeight: 'bold', color: '#1D4ED8', backgroundColor: '#DBEAFE', padding: '2px 8px', borderRadius: '4px' }}>[โหมด: สั่งอาหารเพิ่มเข้าโต๊ะเดิม]</span>
-          </div>
-        </div>
-      )}
 
       {/* Real-time Order Tracking Timeline */}
       {activeOrder && (

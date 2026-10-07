@@ -46,9 +46,18 @@ public class PrintingService
 
                 // Order metadata
                 g.DrawString($"Bill No : {order.OrderNumber}", fontRegular, Brushes.Black, left, y); y += 14;
-                g.DrawString($"Table   : {order.TableNumber ?? "Take Away"}", fontRegular, Brushes.Black, left, y); y += 14;
+                g.DrawString($"Table   : {order.TableDisplay}", fontRegular, Brushes.Black, left, y); y += 14;
                 g.DrawString($"Date    : {order.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm}", fontRegular, Brushes.Black, left, y); y += 14;
-                g.DrawString($"Cashier : {order.CreatedBy ?? "Staff"}", fontRegular, Brushes.Black, left, y); y += 16;
+                g.DrawString($"Cashier : {order.CreatedBy ?? "Staff"}", fontRegular, Brushes.Black, left, y); y += 14;
+                if (!string.IsNullOrWhiteSpace(order.CustomerPhone) || !string.IsNullOrWhiteSpace(order.CustomerName))
+                {
+                    g.DrawString($"Cust    : {order.CustomerDisplay}", fontRegular, Brushes.Black, left, y); y += 14;
+                }
+                if (!string.IsNullOrWhiteSpace(order.Notes))
+                {
+                    g.DrawString($"Note    : {order.Notes}", fontSmall, Brushes.Black, left, y); y += 14;
+                }
+                y += 2;
                 g.DrawString("----------------------------------------", fontRegular, Brushes.Black, left, y);
                 y += 15;
 
@@ -146,10 +155,20 @@ public class PrintingService
 
                 g.DrawString("KITCHEN ORDER SLIP", fontTitle, Brushes.Black, new RectangleF(left, y, width, 22), new StringFormat { Alignment = StringAlignment.Center });
                 y += 24;
-                g.DrawString($"TABLE: {order.TableNumber ?? "TAKE AWAY"}", fontTitle, Brushes.Black, left, y);
+                g.DrawString($"TABLE: {order.TableDisplay}", fontTitle, Brushes.Black, left, y);
                 y += 22;
                 g.DrawString($"Order : {order.OrderNumber}", fontRegular, Brushes.Black, left, y); y += 16;
-                g.DrawString($"Time  : {order.CreatedAt.ToLocalTime():HH:mm:ss}", fontRegular, Brushes.Black, left, y); y += 18;
+                g.DrawString($"Time  : {order.CreatedAt.ToLocalTime():HH:mm:ss}", fontRegular, Brushes.Black, left, y); y += 16;
+                if (!string.IsNullOrWhiteSpace(order.CustomerPhone) || !string.IsNullOrWhiteSpace(order.CustomerName))
+                {
+                    g.DrawString($"Cust  : {order.CustomerDisplay}", fontHeader, Brushes.Black, left, y);
+                    y += 18;
+                }
+                if (!string.IsNullOrWhiteSpace(order.Notes))
+                {
+                    g.DrawString($"Note  : {order.Notes}", fontNotes, Brushes.Black, left, y);
+                    y += 18;
+                }
                 g.DrawString("========================================", fontRegular, Brushes.Black, left, y);
                 y += 16;
 
