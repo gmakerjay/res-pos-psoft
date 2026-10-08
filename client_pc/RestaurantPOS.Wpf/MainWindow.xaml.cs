@@ -840,6 +840,7 @@ public partial class MainWindow : Window
 
     private void FilterProducts(int? categoryId)
     {
+        if (ListProducts == null || _products == null) return;
         _selectedCategoryId = categoryId;
         var search = TxtSearchProduct?.Text?.Trim().ToLowerInvariant() ?? "";
 
@@ -1160,7 +1161,7 @@ public partial class MainWindow : Window
 
     private void ApplyLiveOrdersFilter()
     {
-        if (_liveOrders == null) return;
+        if (_liveOrders == null || GridLiveOrders == null) return;
 
         List<OrderDto> filtered;
         if (RbFilterNew?.IsChecked == true)
@@ -1190,6 +1191,7 @@ public partial class MainWindow : Window
 
     private void FilterOrders_Changed(object sender, RoutedEventArgs e)
     {
+        if (!IsLoaded || GridLiveOrders == null) return;
         ApplyLiveOrdersFilter();
     }
 
@@ -1729,6 +1731,7 @@ public partial class MainWindow : Window
 
     private void FilterIngredients()
     {
+        if (GridStock == null || _ingredients == null) return;
         var search = TxtSearchIngredient?.Text?.Trim().ToLowerInvariant() ?? "";
         var filtered = _ingredients.Where(i => 
             string.IsNullOrEmpty(search) || 
@@ -1932,7 +1935,7 @@ public partial class MainWindow : Window
     {
         if (TxtSoundVolumeLabel != null)
         {
-            TxtSoundVolumeLabel.Text = $"{(int)SliderSoundVolume.Value}%";
+            TxtSoundVolumeLabel.Text = $"{(int)e.NewValue}%";
         }
     }
 

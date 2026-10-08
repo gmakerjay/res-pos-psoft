@@ -439,11 +439,11 @@
                             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock Text="รายการออเดอร์แบบ Real-time:" FontWeight="Bold" FontSize="15.5" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                 <!-- Filter Status Radios -->
-                                <RadioButton x:Name="RbFilterAll" Content="ทั้งหมด" IsChecked="True" Style="{DynamicResource SmallTabRadioStyle}" Checked="FilterOrders_Changed"/>
-                                <RadioButton x:Name="RbFilterNew" Content="ออเดอร์ใหม่" Style="{DynamicResource SmallTabRadioStyle}" Checked="FilterOrders_Changed"/>
-                                <RadioButton x:Name="RbFilterCooking" Content="รับแล้ว / กำลังปรุง" Style="{DynamicResource SmallTabRadioStyle}" Checked="FilterOrders_Changed"/>
-                                <RadioButton x:Name="RbFilterReady" Content="ปรุงเสร็จ / รอเสิร์ฟ" Style="{DynamicResource SmallTabRadioStyle}" Checked="FilterOrders_Changed"/>
-                                <RadioButton x:Name="RbFilterCompleted" Content="เสร็จสิ้นวันนี้" Style="{DynamicResource SmallTabRadioStyle}" Checked="FilterOrders_Changed"/>
+                                <RadioButton x:Name="RbFilterAll" Content="ทั้งหมด" IsChecked="True" GroupName="LiveOrdersFilter" Style="{DynamicResource SmallTabRadioStyle}" Checked="FilterOrders_Changed"/>
+                                <RadioButton x:Name="RbFilterNew" Content="ออเดอร์ใหม่" GroupName="LiveOrdersFilter" Style="{DynamicResource SmallTabRadioStyle}" Checked="FilterOrders_Changed"/>
+                                <RadioButton x:Name="RbFilterCooking" Content="รับแล้ว / กำลังปรุง" GroupName="LiveOrdersFilter" Style="{DynamicResource SmallTabRadioStyle}" Checked="FilterOrders_Changed"/>
+                                <RadioButton x:Name="RbFilterReady" Content="ปรุงเสร็จ / รอเสิร์ฟ" GroupName="LiveOrdersFilter" Style="{DynamicResource SmallTabRadioStyle}" Checked="FilterOrders_Changed"/>
+                                <RadioButton x:Name="RbFilterCompleted" Content="เสร็จสิ้นวันนี้" GroupName="LiveOrdersFilter" Style="{DynamicResource SmallTabRadioStyle}" Checked="FilterOrders_Changed"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
