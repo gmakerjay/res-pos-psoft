@@ -12,15 +12,29 @@ public class TableDto
     public int? CurrentOrderId { get; set; }
     public decimal CurrentBillAmount { get; set; }
     public DateTime? SeatedAt { get; set; }
+    public string? ReservationCustomerName { get; set; }
+    public string? ReservationCustomerPhone { get; set; }
+    public DateTime? ReservationTime { get; set; }
+    public int? ReservationPartySize { get; set; }
+    public string? ReservationNotes { get; set; }
 
     public string StatusBadge => Status switch
     {
         TableStatus.Available => "[ว่าง]",
         TableStatus.Occupied => "[มีลูกค้า]",
-        TableStatus.Reserved => "[จอง]",
+        TableStatus.Reserved => !string.IsNullOrEmpty(ReservationCustomerName) ? $"[จอง: {ReservationCustomerName}]" : "[จอง]",
         TableStatus.Billing => "[รอชำระเงิน]",
         _ => Status.ToString()
     };
+}
+
+public class ReserveTableRequest
+{
+    public string CustomerName { get; set; } = string.Empty;
+    public string CustomerPhone { get; set; } = string.Empty;
+    public DateTime ReservationTime { get; set; } = DateTime.UtcNow;
+    public int PartySize { get; set; } = 2;
+    public string? Notes { get; set; }
 }
 
 public class CreateTableDto
@@ -337,6 +351,7 @@ public class RegisterTenantRequest
     public string? Email { get; set; }
     public string AdminUsername { get; set; } = "admin";
     public string AdminPassword { get; set; } = string.Empty;
+    public string? ConfirmPassword { get; set; }
     public string? Address { get; set; }
 }
 

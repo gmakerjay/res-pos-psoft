@@ -1,1056 +1,1001 @@
-import React, { useState } from 'react';
-import { registerStore, setStoredTenantCode } from '../services/api';
+import { useState } from 'react';
 import type { StoreInfo } from '../services/api';
+import { getServerUrl } from '../services/logger';
 
 interface SoftwareLandingViewProps {
   onOpenLogin: (storeCode?: string) => void;
   onStoreCreated?: (store: StoreInfo) => void;
   onEnterDemo?: (tableOrType?: string) => void;
+  onOpenRegister?: () => void;
 }
 
-function generateSecureStoreCodeClient(): string {
-  const chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-  const getChunk = (len: number) => {
-    let s = "";
-    for (let i = 0; i < len; i++) {
-      s += chars[Math.floor(Math.random() * chars.length)];
+export function SoftwareLandingView({ onOpenLogin, onEnterDemo, onOpenRegister }: SoftwareLandingViewProps) {
+  const [copiedApiUrl, setCopiedApiUrl] = useState(false);
+
+  const serverApiUrl = typeof window !== 'undefined' ? (getServerUrl() || window.location.origin) : 'https://spk.p-services.net';
+
+  const handleOpenRegister = () => {
+    if (onOpenRegister) {
+      onOpenRegister();
+    } else {
+      window.open('/?page=register', '_blank');
     }
-    return s;
-  };
-  return `RPOS-${getChunk(4)}-${getChunk(4)}-${getChunk(4)}`;
-}
-
-export function SoftwareLandingView({ onOpenLogin, onStoreCreated, onEnterDemo }: SoftwareLandingViewProps) {
-  const [storeCode, setStoreCode] = useState(() => generateSecureStoreCodeClient());
-  const [storeName, setStoreName] = useState('');
-  const [ownerName, setOwnerName] = useState('');
-  const [ownerPhone, setOwnerPhone] = useState('');
-  const [adminPassword, setAdminPassword] = useState('123456');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [createdStore, setCreatedStore] = useState<StoreInfo | null>(null);
-  const [copiedKey, setCopiedKey] = useState(false);
-
-  const randomizeCode = () => {
-    setStoreCode(generateSecureStoreCodeClient());
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(true);
-    setTimeout(() => setCopiedKey(false), 2500);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    const cleanCode = storeCode.trim().toUpperCase();
-    if (!cleanCode) {
-      setError('กรุณากรอกหรือสุ่มรหัสความปลอดภัยเชื่อมต่อร้าน');
-      return;
-    }
-    if (!/^[A-Z0-9_-]{3,30}$/.test(cleanCode)) {
-      setError('รหัสความปลอดภัยต้องเป็นตัวอักษรภาษาอังกฤษหรือตัวเลข 3-30 ตัวอักษร');
-      return;
-    }
-    if (!storeName.trim()) {
-      setError('กรุณากรอกชื่อร้านอาหารของคุณ');
-      return;
-    }
-    if (!ownerPhone.trim()) {
-      setError('กรุณากรอกเบอร์โทรศัพท์ติดต่อ');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const res = await registerStore({
-        storeCode: cleanCode,
-        storeName: storeName.trim(),
-        ownerName: ownerName.trim() || 'เจ้าของร้าน',
-        ownerPhone: ownerPhone.trim(),
-        adminUsername: 'admin',
-        adminPassword: adminPassword.trim() || '123456'
-      });
-      setCreatedStore(res);
-      if (onStoreCreated) {
-        onStoreCreated(res);
-      }
-    } catch (err: any) {
-      setError(err.message || 'เกิดข้อผิดพลาดในการลงทะเบียนร้านค้า กรุณาลองใหม่อีกครั้ง');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const resetForm = () => {
-    setCreatedStore(null);
-    setStoreName('');
-    setOwnerName('');
-    setOwnerPhone('');
-    randomizeCode();
   };
 
   return (
-    <div style={{ width: '100%', padding: '0 12px 40px 12px', boxSizing: 'border-box' }}>
-      {/* Hero Section */}
-      <section style={{
-        textAlign: 'center',
-        padding: '32px 12px 24px 12px',
-        maxWidth: '860px',
-        margin: '0 auto'
-      }}>
-        <div style={{
-          display: 'inline-block',
-          backgroundColor: '#E3F2FD',
-          color: '#1565C0',
-          padding: '4px 14px',
-          borderRadius: '20px',
-          fontSize: '12px',
-          fontWeight: 'bold',
-          marginBottom: '14px',
-          border: '1px solid #BBDEFB'
-        }}>
-          [ Windows Desktop POS &amp; Cloud Hub System ]
-        </div>
+    <div style={{ position: 'relative', width: '100%', minHeight: '88vh', boxSizing: 'border-box' }}>
+      {/* Realistic Restaurant Background Z-Layer (Subtle, Atmospheric, Non-Intrusive) */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 0,
+          backgroundImage: 'radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.76) 0%, rgba(244, 246, 249, 0.86) 100%), url(/restaurant_bg.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center center',
+          backgroundRepeat: 'no-repeat',
+          pointerEvents: 'none',
+          filter: 'contrast(1.04) saturate(1.08)'
+        }}
+      />
 
-        <h1 style={{
-          fontSize: 'clamp(22px, 5vw, 34px)',
-          fontWeight: 800,
-          color: '#0D47A1',
-          lineHeight: '1.3',
-          marginBottom: '12px'
+      {/* Main Content Area (Z-Index 1 above background) */}
+      <div style={{ position: 'relative', zIndex: 1, width: '100%', padding: '0 12px 40px 12px', boxSizing: 'border-box' }}>
+        {/* Hero Section */}
+        <section style={{
+          textAlign: 'center',
+          padding: '32px 12px 24px 12px',
+          maxWidth: '860px',
+          margin: '0 auto'
         }}>
-          ระบบบริหารจัดการร้านอาหาร และจุดขาย POS หน้าร้าน
-        </h1>
+          <div style={{
+            display: 'inline-block',
+            backgroundColor: '#E3F2FD',
+            color: '#1565C0',
+            padding: '4px 14px',
+            borderRadius: '20px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            marginBottom: '14px',
+            border: '1px solid #BBDEFB'
+          }}>
+            [ Windows Desktop POS &amp; Cloud Hub System ]
+          </div>
 
-        <p style={{
-          fontSize: 'clamp(14px, 3.5vw, 16px)',
-          color: '#455A64',
-          lineHeight: '1.6',
-          maxWidth: '680px',
-          margin: '0 auto 20px auto'
-        }}>
-          ซอฟต์แวร์ขายหน้าร้านบน Windows สั่งพิมพ์สลิปและใบสั่งครัวอัตโนมัติ 
-          พร้อมระบบ QR Code สั่งอาหารประจำโต๊ะ และจอแสดงออเดอร์ในครัว (KDS) เรียลไทม์
-        </p>
+          <h1 style={{
+            fontSize: 'clamp(22px, 5vw, 34px)',
+            fontWeight: 800,
+            color: '#0D47A1',
+            lineHeight: '1.3',
+            marginBottom: '12px'
+          }}>
+            ระบบบริหารจัดการร้านอาหาร และจุดขาย POS หน้าร้าน
+          </h1>
 
-        {/* Feature Pills */}
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          gap: '8px',
-          marginBottom: '28px'
-        }}>
-          <span style={{ backgroundColor: '#ECEFF1', color: '#37474F', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
-            [สำหรับ Windows PC]
-          </span>
-          <span style={{ backgroundColor: '#ECEFF1', color: '#37474F', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
-            [พิมพ์สลิป &amp; ใบสั่งครัว]
-          </span>
-          <span style={{ backgroundColor: '#ECEFF1', color: '#37474F', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
-            [QR Code สั่งอาหารประจำโต๊ะ]
-          </span>
-          <span style={{ backgroundColor: '#ECEFF1', color: '#37474F', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
-            [จอครัว KDS เรียลไทม์]
-          </span>
-          <span style={{ backgroundColor: '#E8F5E9', color: '#2E7D32', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
-            [ทดสอบผ่าน Cloud Server ฟรี]
-          </span>
-        </div>
-      </section>
+          <p style={{
+            fontSize: 'clamp(14px, 3.5vw, 16px)',
+            color: '#455A64',
+            lineHeight: '1.6',
+            maxWidth: '680px',
+            margin: '0 auto 20px auto'
+          }}>
+            ซอฟต์แวร์ขายหน้าร้านบน Windows สั่งพิมพ์สลิปและใบสั่งครัวอัตโนมัติ 
+            พร้อมระบบ QR Code สั่งอาหารประจำโต๊ะ และจอแสดงออเดอร์ในครัว (KDS) เรียลไทม์
+          </p>
 
-      {/* Live Demo Showcase Section (Dedicated for Sales Pitch & Client Demonstration) */}
-      <section style={{
-        maxWidth: '920px',
-        margin: '0 auto 36px auto',
-        backgroundColor: '#FFFFFF',
-        borderRadius: '12px',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
-        border: '2px solid #90CAF9',
-        overflow: 'hidden'
-      }}>
-        {/* Banner Header */}
-        <div style={{
-          backgroundColor: '#1565C0',
-          color: '#FFF',
-          padding: '16px 20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '10px'
+          {/* Feature Pills */}
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            gap: '8px',
+            marginBottom: '24px'
+          }}>
+            <span style={{ backgroundColor: '#ECEFF1', color: '#37474F', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+              [สำหรับ Windows PC]
+            </span>
+            <span style={{ backgroundColor: '#ECEFF1', color: '#37474F', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+              [พิมพ์สลิป &amp; ใบสั่งครัว]
+            </span>
+            <span style={{ backgroundColor: '#ECEFF1', color: '#37474F', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+              [QR Code สั่งอาหารประจำโต๊ะ]
+            </span>
+            <span style={{ backgroundColor: '#ECEFF1', color: '#37474F', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+              [จอครัว KDS เรียลไทม์]
+            </span>
+            <span style={{ backgroundColor: '#E8F5E9', color: '#2E7D32', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+              [ทดสอบผ่าน Cloud Server ฟรี]
+            </span>
+          </div>
+
+          {/* Hero Call-to-Action Actions */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '12px',
+            flexWrap: 'wrap',
+            marginBottom: '10px'
+          }}>
+            <button
+              type="button"
+              onClick={handleOpenRegister}
+              style={{
+                backgroundColor: '#0D47A1',
+                color: '#FFF',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                fontSize: '15px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(13, 71, 161, 0.35)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              [ + ลงทะเบียนร้านค้าใหม่ (เปิดหน้าใหม่) ]
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenLogin('DEFAULT')}
+              style={{
+                backgroundColor: '#FFF',
+                color: '#0D47A1',
+                border: '2px solid #0D47A1',
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+              }}
+            >
+              [ เข้าสู่ระบบร้านค้า ]
+            </button>
+          </div>
+        </section>
+
+        {/* Live Demo Showcase Section (Dedicated for Sales Pitch & Client Demonstration) */}
+        <section style={{
+          maxWidth: '920px',
+          margin: '0 auto 36px auto',
+          backgroundColor: '#FFFFFF',
+          borderRadius: '12px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+          border: '2px solid #90CAF9',
+          overflow: 'hidden'
         }}>
-          <div>
+          {/* Banner Header */}
+          <div style={{
+            backgroundColor: '#1565C0',
+            color: '#FFF',
+            padding: '16px 20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '10px'
+          }}>
+            <div>
+              <div style={{
+                display: 'inline-block',
+                backgroundColor: '#FFD54F',
+                color: '#0D47A1',
+                padding: '2px 10px',
+                borderRadius: '12px',
+                fontSize: '11.5px',
+                fontWeight: 'bold',
+                marginBottom: '4px'
+              }}>
+                [ สำหรับการสาธิตและทดลองขายจริง (Live Demo) ]
+              </div>
+              <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: '2px 0' }}>
+                สัมผัสประสบการณ์ใช้งานระบบจริง (Interactive Live Demo)
+              </h2>
+              <div style={{ fontSize: '12.5px', color: '#E3F2FD' }}>
+                ทดลองสั่งอาหารในมุมมองของลูกค้า หรือเปิดดูจอรับออเดอร์ในครัวแบบเรียลไทม์
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onEnterDemo ? onEnterDemo('T01') : (window.location.href = '/?store=DEFAULT&table=T01')}
+              style={{
+                backgroundColor: '#FFEB3B',
+                color: '#0D47A1',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '6px',
+                fontSize: '13.5px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              [ เปิดหน้าร้านตัวอย่างทันที ]
+            </button>
+          </div>
+
+          {/* 3 Showcase Action Cards */}
+          <div style={{
+            padding: '20px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '16px',
+            backgroundColor: '#F8F9FA'
+          }}>
+            {/* Card 1: Dine-In Table QR */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #BBDEFB',
+              borderRadius: '8px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{
+                  display: 'inline-block',
+                  backgroundColor: '#E3F2FD',
+                  color: '#1565C0',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  marginBottom: '8px'
+                }}>
+                  [ สแกนสั่งอาหารประจำโต๊ะ T01 ]
+                </div>
+                <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#0D47A1', margin: '0 0 6px 0' }}>
+                  สั่งอาหารที่โต๊ะ (Dine-In QR)
+                </h3>
+                <p style={{ fontSize: '12.5px', color: '#555', lineHeight: '1.5', margin: '0 0 14px 0' }}>
+                  จำลองเป็นลูกค้านั่งโต๊ะ 1 สแกน QR ดูรูปภาพเมนู ปรับระดับความเผ็ด และสั่งลงครัว
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onEnterDemo ? onEnterDemo('T01') : (window.location.href = '/?store=DEFAULT&table=T01')}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#1976D2',
+                  color: '#FFF',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                ทดลองสั่งอาหารโต๊ะ 1
+              </button>
+            </div>
+
+            {/* Card 2: Takeaway Ordering */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #C8E6C9',
+              borderRadius: '8px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{
+                  display: 'inline-block',
+                  backgroundColor: '#E8F5E9',
+                  color: '#2E7D32',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  marginBottom: '8px'
+                }}>
+                  [ สั่งกลับบ้าน / สั่งล่วงหน้า ]
+                </div>
+                <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1B5E20', margin: '0 0 6px 0' }}>
+                  สั่งกลับบ้าน (Takeaway QR)
+                </h3>
+                <p style={{ fontSize: '12.5px', color: '#555', lineHeight: '1.5', margin: '0 0 14px 0' }}>
+                  สำหรับลูกค้าสั่งล่วงหน้าจากที่บ้าน หรือสั่งกลับบ้านหน้าร้านโดยไม่ต้องระบุเลขโต๊ะ
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onEnterDemo ? onEnterDemo('takeaway') : (window.location.href = '/?store=DEFAULT&type=takeaway')}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#2E7D32',
+                  color: '#FFF',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                ทดลองสั่งกลับบ้าน
+              </button>
+            </div>
+
+            {/* Card 3: Kitchen KDS & Management */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #FFE082',
+              borderRadius: '8px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{
+                  display: 'inline-block',
+                  backgroundColor: '#FFF8E1',
+                  color: '#F57F17',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  marginBottom: '8px'
+                }}>
+                  [ รหัสทดลอง: admin / psoft123 ]
+                </div>
+                <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#E65100', margin: '0 0 6px 0' }}>
+                  จอครัว KDS &amp; ระบบจัดการร้าน
+                </h3>
+                <p style={{ fontSize: '12.5px', color: '#555', lineHeight: '1.5', margin: '0 0 14px 0' }}>
+                  เข้าดูจอรับออเดอร์ในครัวแบบเรียลไทม์ และระบบสต๊อกวัตถุดิบ/รายงานยอดขาย
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onOpenLogin('DEFAULT')}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  border: '1px solid #FFA000',
+                  backgroundColor: '#FFF8E1',
+                  color: '#E65100',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                เข้าดูจอครัว &amp; ระบบจัดการ
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Comprehensive POS Modules & Capabilities Showcase (Replacing old inline form) */}
+        <section style={{
+          maxWidth: '960px',
+          margin: '0 auto 40px auto',
+          padding: '0 10px'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <div style={{
+              display: 'inline-block',
+              backgroundColor: '#E8F5E9',
+              color: '#2E7D32',
+              padding: '4px 14px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              marginBottom: '8px',
+              border: '1px solid #C8E6C9'
+            }}>
+              [ ฟังก์ชันครบวงจรสำหรับร้านอาหารทุกระดับ ]
+            </div>
+            <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0D47A1', margin: '0 0 6px 0' }}>
+              โมดูลการทำงานอัจฉริยะ เชื่อมต่อทุกจุดในร้านอาหาร
+            </h2>
+            <p style={{ fontSize: '13.5px', color: '#546E7A', margin: 0, lineHeight: '1.6' }}>
+              ออกแบบมาเพื่อความเร็ว ความแม่นยำ และความเสถียรสูงสุด ครอบคลุมทั้งหน้าร้าน ในครัว ลูกค้า และฝ่ายบริหาร
+            </p>
+          </div>
+
+          {/* 6 Key Modules Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '16px',
+            marginBottom: '28px'
+          }}>
+            {/* Module 1: Desktop POS */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #BBDEFB',
+              borderRadius: '10px',
+              padding: '20px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{ display: 'inline-block', backgroundColor: '#E3F2FD', color: '#1565C0', padding: '3px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', marginBottom: '10px' }}>
+                  [ หน้าร้าน ]
+                </div>
+                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0D47A1', margin: '0 0 8px 0' }}>
+                  Windows Desktop POS หน้าร้าน
+                </h3>
+                <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.6', margin: '0 0 14px 0' }}>
+                  โปรแกรมขายหน้าร้าน C# WPF Classic XP Theme ทำงานรวดเร็ว รองรับจอสัมผัส ย้ายโต๊ะ รวมบิล พักโต๊ะ และสั่งพิมพ์สลิปใบเสร็จอัตโนมัติผ่าน Windows Spooler / ESC-POS
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ เสถียรสูง ]</span>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ คีย์ลัด F1-F12 ]</span>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ พิมพ์สลิปทันที ]</span>
+              </div>
+            </div>
+
+            {/* Module 2: Customer QR */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #C8E6C9',
+              borderRadius: '10px',
+              padding: '20px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{ display: 'inline-block', backgroundColor: '#E8F5E9', color: '#2E7D32', padding: '3px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', marginBottom: '10px' }}>
+                  [ ลูกค้า ]
+                </div>
+                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1B5E20', margin: '0 0 8px 0' }}>
+                  สั่งอาหารผ่าน QR Code (Customer QR)
+                </h3>
+                <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.6', margin: '0 0 14px 0' }}>
+                  ลูกค้าสแกน QR Code ประจำโต๊ะด้วยสมาร์ทโฟน ไม่ต้องติดตั้งแอป สั่งอาหารได้เองอย่างสะดวก รวดเร็ว พร้อมเลือกออปชันพิเศษและระดับความเผ็ดได้ตามใจชอบ
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ ทานที่ร้าน (Dine-In) ]</span>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ สั่งกลับบ้าน (Takeaway) ]</span>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ ติดตามสถานะ ]</span>
+              </div>
+            </div>
+
+            {/* Module 3: Kitchen KDS */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #FFE082',
+              borderRadius: '10px',
+              padding: '20px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{ display: 'inline-block', backgroundColor: '#FFF8E1', color: '#F57F17', padding: '3px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', marginBottom: '10px' }}>
+                  [ ในครัว ]
+                </div>
+                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#E65100', margin: '0 0 8px 0' }}>
+                  จอครัวอัจฉริยะ (Kitchen Display KDS)
+                </h3>
+                <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.6', margin: '0 0 14px 0' }}>
+                  จอแสดงรายการออเดอร์ในครัวแบบ SignalR Real-Time เด้งเตือนเสียงทันทีเมื่อมีออเดอร์ใหม่ แยกสเตชันครัว/บาร์น้ำ ปรุงเสร็จแตะเปลี่ยนสถานะ [กำลังปรุง] ถึง [พร้อมเสิร์ฟ]
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ อัปเดตเสี้ยววินาที ]</span>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ แจ้งเตือนเสียง ]</span>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ เตือนออเดอร์ค้าง ]</span>
+              </div>
+            </div>
+
+            {/* Module 4: Inventory & Recipe */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #D1C4E9',
+              borderRadius: '10px',
+              padding: '20px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{ display: 'inline-block', backgroundColor: '#EDE7F6', color: '#512DA8', padding: '3px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', marginBottom: '10px' }}>
+                  [ คลังสต๊อก ]
+                </div>
+                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#4A148C', margin: '0 0 8px 0' }}>
+                  คลังวัตถุดิบ &amp; สูตรอาหาร (Recipe BOM)
+                </h3>
+                <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.6', margin: '0 0 14px 0' }}>
+                  ผูกสูตรอาหาร (Bill of Materials) คำนวณและตัดสต๊อกวัตถุดิบอัตโนมัติตามยอดขายจริง พร้อมระบบแจ้งเตือนเมื่อวัตถุดิบใกล้หมด ป้องกันของขาดช่วงเวลาเร่งด่วน
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ ตัดสต๊อกอัตโนมัติ ]</span>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ แจ้งเตือนใกล้หมด ]</span>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ ประวัติเบิกจ่าย ]</span>
+              </div>
+            </div>
+
+            {/* Module 5: Sales Reports & Backup */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #B2DFDB',
+              borderRadius: '10px',
+              padding: '20px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{ display: 'inline-block', backgroundColor: '#E0F2F1', color: '#00695C', padding: '3px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', marginBottom: '10px' }}>
+                  [ การเงิน &amp; บัญชี ]
+                </div>
+                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#004D40', margin: '0 0 8px 0' }}>
+                  รายงานยอดขาย สรุปบัญชี และสำรองข้อมูล
+                </h3>
+                <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.6', margin: '0 0 14px 0' }}>
+                  สรุปยอดขายรายวัน รายเดือน รายหมวดหมู่อาหาร คำนวณกำไร/ต้นทุน และภาษีมูลค่าเพิ่ม (VAT 7%) พร้อมระบบสำรองข้อมูลร้านค้า (Export / Backup) ก้อนเดียวจบ นำไปใช้งานต่อได้ทันที
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ รายงานยอดขาย ]</span>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ ปิดกะ/ตัดรอบ ]</span>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ 1-Click Backup ]</span>
+              </div>
+            </div>
+
+            {/* Module 6: Multi-Tenant Cloud */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #CFD8DC',
+              borderRadius: '10px',
+              padding: '20px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{ display: 'inline-block', backgroundColor: '#ECEFF1', color: '#37474F', padding: '3px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', marginBottom: '10px' }}>
+                  [ คลาวด์ &amp; ความปลอดภัย ]
+                </div>
+                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#263238', margin: '0 0 8px 0' }}>
+                  สถาปัตยกรรมคลาวด์แยกฐานข้อมูล 100%
+                </h3>
+                <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.6', margin: '0 0 14px 0' }}>
+                  ความปลอดภัยระดับสูงสุด แยกฐานข้อมูล 1 ร้าน = 1 ฐานข้อมูล 100% ไม่ปะปนกับร้านอื่น ล็อกอินด้วย Store Code และ Password ผ่าน Cloud API พร้อมระบบทดลองใช้ฟรี 14 วันจริง
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ ฐานข้อมูลแยกเฉพาะ ]</span>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ เข้ารหัสรหัสผ่าน ]</span>
+                <span style={{ backgroundColor: '#F5F5F5', color: '#455A64', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>[ ทดลองฟรี 14 วัน ]</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Launch & Dedicated Registration Action Banner */}
+          <div style={{
+            background: 'linear-gradient(135deg, #0D47A1 0%, #1565C0 100%)',
+            color: '#FFF',
+            borderRadius: '12px',
+            padding: '28px 24px',
+            boxShadow: '0 8px 24px rgba(13, 71, 161, 0.25)',
+            textAlign: 'center',
+            border: '1px solid #1976D2'
+          }}>
             <div style={{
               display: 'inline-block',
               backgroundColor: '#FFD54F',
               color: '#0D47A1',
-              padding: '2px 10px',
-              borderRadius: '12px',
-              fontSize: '11.5px',
+              padding: '4px 14px',
+              borderRadius: '20px',
+              fontSize: '12px',
               fontWeight: 'bold',
-              marginBottom: '4px'
+              marginBottom: '12px'
             }}>
-              [ สำหรับการสาธิตและทดลองขายจริง (Live Demo) ]
+              [ เริ่มต้นเปิดร้านค้าของคุณวันนี้ ]
             </div>
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: '2px 0' }}>
-              สัมผัสประสบการณ์ใช้งานระบบจริง (Interactive Live Demo)
+
+            <h2 style={{ fontSize: 'clamp(20px, 4vw, 26px)', fontWeight: 800, margin: '0 0 8px 0', color: '#FFF' }}>
+              พร้อมยกระดับการบริหารจัดการร้านอาหารของคุณแล้วหรือยัง?
             </h2>
-            <div style={{ fontSize: '12.5px', color: '#E3F2FD' }}>
-              ทดลองสั่งอาหารในมุมมองของลูกค้า หรือเปิดดูจอรับออเดอร์ในครัวแบบเรียลไทม์
+
+            <p style={{ fontSize: '14px', color: '#BBDEFB', maxWidth: '640px', margin: '0 auto 20px auto', lineHeight: '1.6' }}>
+              ลงทะเบียนง่ายๆ ภายใน 1 นาที เพื่อรับรหัสร้านค้า (Store Code) พร้อมนำไปเชื่อมต่อและเปิดใช้งานโปรแกรมขายหน้าร้านบน Windows ได้ทันที
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '22px' }}>
+              <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', padding: '5px 12px', borderRadius: '20px', fontSize: '12px' }}>
+                [ 1. ลงทะเบียนรับรหัสร้าน ]
+              </span>
+              <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', padding: '5px 12px', borderRadius: '20px', fontSize: '12px' }}>
+                [ 2. นำไอดี/พาสไปล็อกอิน ]
+              </span>
+              <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', padding: '5px 12px', borderRadius: '20px', fontSize: '12px' }}>
+                [ 3. เริ่มขายหน้าร้านได้ทันที ]
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', flexWrap: 'wrap', marginBottom: '20px' }}>
+              <button
+                type="button"
+                onClick={handleOpenRegister}
+                style={{
+                  backgroundColor: '#FFEB3B',
+                  color: '#0D47A1',
+                  border: 'none',
+                  padding: '14px 28px',
+                  borderRadius: '8px',
+                  fontSize: '15.5px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                [ + เปิดหน้าต่างลงทะเบียนร้านค้าใหม่ ]
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onOpenLogin('DEFAULT')}
+                style={{
+                  backgroundColor: 'transparent',
+                  color: '#FFF',
+                  border: '2px solid rgba(255,255,255,0.8)',
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                [ เข้าสู่ระบบร้านค้า ]
+              </button>
+            </div>
+
+            {/* Connection API URL Info Box */}
+            <div style={{
+              maxWidth: '560px',
+              margin: '0 auto',
+              backgroundColor: 'rgba(0, 0, 0, 0.22)',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              textAlign: 'left'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                <span style={{ fontSize: '12px', color: '#BBDEFB', fontWeight: 'bold' }}>
+                  Server API URL สำหรับเชื่อมต่อโปรแกรม POS:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(serverApiUrl);
+                    setCopiedApiUrl(true);
+                    setTimeout(() => setCopiedApiUrl(false), 2500);
+                  }}
+                  style={{
+                    backgroundColor: copiedApiUrl ? '#2E7D32' : '#FFD54F',
+                    color: copiedApiUrl ? '#FFF' : '#0D47A1',
+                    border: 'none',
+                    padding: '3px 10px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {copiedApiUrl ? '[ คัดลอกสำเร็จ ]' : '[ คัดลอก API URL ]'}
+                </button>
+              </div>
+              <div style={{
+                fontFamily: 'Consolas, monospace',
+                fontSize: '13px',
+                color: '#FFF',
+                fontWeight: 'bold',
+                wordBreak: 'break-all'
+              }}>
+                {serverApiUrl}
+              </div>
+              <div style={{ fontSize: '11px', color: '#90CAF9', marginTop: '4px' }}>
+                * คำแนะนำการใช้งาน: เวลาใช้งานจริง แค่เอาไอดี กับ พาสที่สมัครลงทะเบียนไว้ ไปล็อกอินในโปรแกรม POS บนคอมพิวเตอร์ หรือบนเว็บได้ทันที
+              </div>
             </div>
           </div>
+        </section>
 
-          <button
-            type="button"
-            onClick={() => onEnterDemo ? onEnterDemo('T01') : (window.location.href = '/?store=DEFAULT&table=T01')}
-            style={{
-              backgroundColor: '#FFEB3B',
-              color: '#0D47A1',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '6px',
-              fontSize: '13.5px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            [ เปิดหน้าร้านตัวอย่างทันที ]
-          </button>
-        </div>
-
-        {/* 3 Showcase Action Cards */}
-        <div style={{
-          padding: '20px',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '16px',
-          backgroundColor: '#F8F9FA'
+        {/* Workflow & Architecture Concept Section */}
+        <section style={{
+          maxWidth: '960px',
+          margin: '0 auto 40px auto',
+          padding: '0 10px'
         }}>
-          {/* Card 1: Dine-In Table QR */}
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0D47A1', marginBottom: '6px' }}>
+              โฟลวการทำงานของระบบ Restaurant POS
+            </h2>
+            <p style={{ fontSize: '13px', color: '#546E7A', margin: 0 }}>
+              ขั้นตอนง่ายๆ ตั้งแต่ลงทะเบียน เชื่อมต่อโปรแกรม จนถึงลูกค้าสแกนสั่งอาหาร
+            </p>
+          </div>
+
           <div style={{
-            backgroundColor: '#FFF',
-            border: '1px solid #BBDEFB',
-            borderRadius: '8px',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between'
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+            gap: '14px',
+            marginBottom: '24px'
           }}>
-            <div>
+            {/* Step 1 */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #E0E0E0',
+              borderRadius: '8px',
+              padding: '16px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+            }}>
               <div style={{
                 display: 'inline-block',
                 backgroundColor: '#E3F2FD',
                 color: '#1565C0',
                 padding: '3px 8px',
                 borderRadius: '4px',
-                fontSize: '11px',
+                fontSize: '11.5px',
                 fontWeight: 'bold',
                 marginBottom: '8px'
               }}>
-                [ สแกนสั่งอาหารประจำโต๊ะ T01 ]
+                ขั้นตอนที่ 1
               </div>
-              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#0D47A1', margin: '0 0 6px 0' }}>
-                สั่งอาหารที่โต๊ะ (Dine-In QR)
-              </h3>
-              <p style={{ fontSize: '12.5px', color: '#555', lineHeight: '1.5', margin: '0 0 14px 0' }}>
-                จำลองเป็นลูกค้านั่งโต๊ะ 1 สแกน QR ดูรูปภาพเมนู ปรับระดับความเผ็ด และสั่งลงครัว
-              </p>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
+                ลงทะเบียนรับรหัส
+              </div>
+              <div style={{ fontSize: '12.5px', color: '#666', lineHeight: '1.5' }}>
+                สมัครสมาชิกบนหน้าเว็บเพื่อรับรหัสความปลอดภัย (Security Key) ประจำร้านของคุณ
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => onEnterDemo ? onEnterDemo('T01') : (window.location.href = '/?store=DEFAULT&table=T01')}
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: '#1976D2',
-                color: '#FFF',
-                fontSize: '13px',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-            >
-              ทดลองสั่งอาหารโต๊ะ 1
-            </button>
-          </div>
 
-          {/* Card 2: Takeaway Ordering */}
-          <div style={{
-            backgroundColor: '#FFF',
-            border: '1px solid #C8E6C9',
-            borderRadius: '8px',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between'
-          }}>
-            <div>
+            {/* Step 2 */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #E0E0E0',
+              borderRadius: '8px',
+              padding: '16px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+            }}>
               <div style={{
                 display: 'inline-block',
                 backgroundColor: '#E8F5E9',
                 color: '#2E7D32',
                 padding: '3px 8px',
                 borderRadius: '4px',
-                fontSize: '11px',
+                fontSize: '11.5px',
                 fontWeight: 'bold',
                 marginBottom: '8px'
               }}>
-                [ สั่งกลับบ้าน / สั่งล่วงหน้า ]
+                ขั้นตอนที่ 2
               </div>
-              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1B5E20', margin: '0 0 6px 0' }}>
-                สั่งกลับบ้าน (Takeaway QR)
-              </h3>
-              <p style={{ fontSize: '12.5px', color: '#555', lineHeight: '1.5', margin: '0 0 14px 0' }}>
-                สำหรับลูกค้าสั่งล่วงหน้าจากที่บ้าน หรือสั่งกลับบ้านหน้าร้านโดยไม่ต้องระบุเลขโต๊ะ
-              </p>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
+                เชื่อมต่อโปรแกรม POS
+              </div>
+              <div style={{ fontSize: '12.5px', color: '#666', lineHeight: '1.5' }}>
+                นำรหัสที่ได้ไปกรอกในโปรแกรม Restaurant POS บนเครื่องคอมพิวเตอร์ Windows หน้าร้าน
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => onEnterDemo ? onEnterDemo('takeaway') : (window.location.href = '/?store=DEFAULT&type=takeaway')}
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: '#2E7D32',
-                color: '#FFF',
-                fontSize: '13px',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-            >
-              ทดลองสั่งกลับบ้าน
-            </button>
-          </div>
 
-          {/* Card 3: Kitchen KDS & Management */}
-          <div style={{
-            backgroundColor: '#FFF',
-            border: '1px solid #FFE082',
-            borderRadius: '8px',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between'
-          }}>
-            <div>
+            {/* Step 3 */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #E0E0E0',
+              borderRadius: '8px',
+              padding: '16px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+            }}>
               <div style={{
                 display: 'inline-block',
-                backgroundColor: '#FFF8E1',
-                color: '#F57F17',
+                backgroundColor: '#FFF3E0',
+                color: '#E65100',
                 padding: '3px 8px',
                 borderRadius: '4px',
-                fontSize: '11px',
+                fontSize: '11.5px',
                 fontWeight: 'bold',
                 marginBottom: '8px'
               }}>
-                [ รหัสทดลอง: admin / psoft123 ]
+                ขั้นตอนที่ 3
               </div>
-              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#E65100', margin: '0 0 6px 0' }}>
-                จอครัว KDS &amp; ระบบจัดการร้าน
-              </h3>
-              <p style={{ fontSize: '12.5px', color: '#555', lineHeight: '1.5', margin: '0 0 14px 0' }}>
-                เข้าดูจอรับออเดอร์ในครัวแบบเรียลไทม์ และระบบสต๊อกวัตถุดิบ/รายงานยอดขาย
+              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
+                พิมพ์ QR Code ติดโต๊ะ
+              </div>
+              <div style={{ fontSize: '12.5px', color: '#666', lineHeight: '1.5' }}>
+                โปรแกรม POS จะพิมพ์สติ๊กเกอร์ QR Code ประจำแต่ละโต๊ะให้ลูกค้านั่งที่ร้านสแกนสั่ง
+              </div>
+            </div>
+
+            {/* Step 4 */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #E0E0E0',
+              borderRadius: '8px',
+              padding: '16px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{
+                display: 'inline-block',
+                backgroundColor: '#F3E5F5',
+                color: '#6A1B9A',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                fontSize: '11.5px',
+                fontWeight: 'bold',
+                marginBottom: '8px'
+              }}>
+                ขั้นตอนที่ 4
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
+                รับออเดอร์ &amp; ตัดสต็อก
+              </div>
+              <div style={{ fontSize: '12.5px', color: '#666', lineHeight: '1.5' }}>
+                ลูกค้าสแกนสั่งจากมือถือ ออเดอร์เด้งเข้าหน้าแคชเชียร์และจอครัว KDS อัตโนมัติทันที
+              </div>
+            </div>
+          </div>
+
+          {/* Important Platform Clarification Notice */}
+          <div style={{
+            backgroundColor: '#FFFDE7',
+            border: '1px solid #FFF59D',
+            borderRadius: '8px',
+            padding: '14px 18px',
+            fontSize: '13px',
+            color: '#795548',
+            lineHeight: '1.6'
+          }}>
+            <strong>ข้อแนะนำการใช้งาน:</strong> เพื่อความเสถียรและประสิทธิภาพสูงสุดในการพิมพ์ใบเสร็จและควบคุมแคชเชียร์ 
+            แนะนำให้ใช้งานตัวโปรแกรม <strong>Windows Desktop Client (C# WPF)</strong> บนเครื่องคอมพิวเตอร์หน้าร้าน 
+            โดยระบบเว็บนี้จะทำหน้าที่เป็นศูนย์กลางคลาวด์รับออเดอร์จากมือถือของลูกค้าและส่งต่อข้อมูลแบบเรียลไทม์
+          </div>
+        </section>
+
+        {/* Key Features Grid */}
+        <section style={{
+          maxWidth: '960px',
+          margin: '0 auto 40px auto',
+          padding: '0 10px'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0D47A1', marginBottom: '6px' }}>
+              จุดเด่นของซอฟต์แวร์ Restaurant POS
+            </h2>
+            <p style={{ fontSize: '13px', color: '#546E7A', margin: 0 }}>
+              ครบทุกฟังก์ชันที่ร้านอาหารยุคใหม่ต้องการ ออกแบบตามมาตรฐานร้านอาหารชั้นนำ
+            </p>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '16px'
+          }}>
+            {/* Card 1 */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #E0E0E0',
+              borderRadius: '8px',
+              padding: '18px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#0D47A1', marginBottom: '6px' }}>
+                [ หน้าจอขายหน้าร้านบน Windows ]
+              </div>
+              <p style={{ fontSize: '13px', color: '#555', margin: 0, lineHeight: '1.6' }}>
+                อินเทอร์เฟซสไตล์ Classic XP ทำงานรวดเร็ว รองรับจอสัมผัส (Touch Screen) 
+                สั่งพิมพ์ใบเสร็จ สลิป และใบสั่งครัวผ่านเครื่องพิมพ์ความร้อน (Thermal Printer) โดยตรง
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => onOpenLogin('DEFAULT')}
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '6px',
-                border: '1px solid #FFA000',
-                backgroundColor: '#FFF8E1',
-                color: '#E65100',
-                fontSize: '13px',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-            >
-              เข้าดูจอครัว &amp; ระบบจัดการ
-            </button>
-          </div>
-        </div>
-      </section>
 
-      {/* Main Registration Card (Front & Center) */}
-      <section style={{
-        maxWidth: '600px',
-        margin: '0 auto 40px auto',
-        backgroundColor: '#FFF',
-        borderRadius: '12px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-        border: '1px solid #E0E0E0',
-        overflow: 'hidden'
-      }}>
-        {/* Card Header */}
-        <div style={{
-          backgroundColor: '#0D47A1',
-          color: '#FFF',
-          padding: '16px 20px',
+            {/* Card 2 */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #E0E0E0',
+              borderRadius: '8px',
+              padding: '18px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1B5E20', marginBottom: '6px' }}>
+                [ ลูกค้าสั่งอาหารผ่าน QR Code ]
+              </div>
+              <p style={{ fontSize: '13px', color: '#555', margin: 0, lineHeight: '1.6' }}>
+                ลดภาระพนักงานเสิร์ฟ ลูกค้าสแกน QR Code บนโต๊ะเพื่อเลือกดูเมนู 
+                และสั่งอาหารได้เองทันทีผ่านเบราว์เซอร์บนมือถือ ไม่ต้องลงแอปพลิเคชัน
+              </p>
+            </div>
+
+            {/* Card 3 */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #E0E0E0',
+              borderRadius: '8px',
+              padding: '18px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#B71C1C', marginBottom: '6px' }}>
+                [ จอแสดงผลในครัว (KDS) เรียลไทม์ ]
+              </div>
+              <p style={{ fontSize: '13px', color: '#555', margin: 0, lineHeight: '1.6' }}>
+                ออเดอร์ที่ลูกค้าสั่งจะถูกส่งตรงเข้าจอในครัวทันทีแบบวินาทีต่อวินาที 
+                พร้อมแจ้งเตือนด้วยเสียง และระบุสถานะอาหาร (รอทำ, กำลังทำ, พร้อมเสิร์ฟ)
+              </p>
+            </div>
+
+            {/* Card 4 */}
+            <div style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #E0E0E0',
+              borderRadius: '8px',
+              padding: '18px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#E65100', marginBottom: '6px' }}>
+                [ ระบบตัดสต็อก &amp; รายงานยอดขาย ]
+              </div>
+              <p style={{ fontSize: '13px', color: '#555', margin: 0, lineHeight: '1.6' }}>
+                ตัดสต็อกวัตถุดิบอัตโนมัติตามสัดส่วนที่ตั้งไว้ในเมนู พร้อมรายงานยอดขายรายวัน 
+                สรุปช่วงเวลาขายดี และประวัติการทำรายการอย่างครบถ้วน
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Demo Callout Banner */}
+        <section style={{
+          maxWidth: '800px',
+          margin: '0 auto',
+          backgroundColor: '#E8EAF6',
+          border: '1px solid #C5CAE9',
+          borderRadius: '10px',
+          padding: '20px',
           textAlign: 'center'
         }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 4px 0' }}>
-            {createdStore ? 'ลงทะเบียนร้านค้าสำเร็จแล้ว' : 'ลงทะเบียนขอรับรหัสความปลอดภัย ทดลองใช้ฟรี'}
-          </h2>
-          <p style={{ fontSize: '12.5px', color: '#BBDEFB', margin: 0 }}>
-            {createdStore 
-              ? 'นำรหัสความปลอดภัยนี้ไปเชื่อมต่อในโปรแกรม POS บนคอมพิวเตอร์ของคุณ'
-              : 'กรอกข้อมูลง่ายๆ เพื่อรับรหัสเชื่อมต่อ (Store Code) เริ่มต้นใช้งานทันที'}
+          <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#283593', marginBottom: '6px' }}>
+            ต้องการทดสอบระบบสั่งอาหารของลูกค้าจำลองใช่หรือไม่?
+          </div>
+          <p style={{ fontSize: '13px', color: '#3949AB', marginBottom: '14px' }}>
+            คุณสามารถทดลองใช้งานระบบสั่งอาหารผ่าน QR Code ในมุมมองของลูกค้าที่นั่งโต๊ะ 1 ได้ทันที
           </p>
-        </div>
-
-        {/* Card Body */}
-        <div style={{ padding: '24px 20px' }}>
-          {createdStore ? (
-            <div>
-              {/* Success Banner */}
-              <div style={{
-                backgroundColor: '#E8F5E9',
-                border: '1px solid #A5D6A7',
-                borderRadius: '8px',
-                padding: '14px',
-                marginBottom: '20px',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2E7D32', marginBottom: '4px' }}>
-                  [ ลงทะเบียนสำเร็จ ] ยินดีต้อนรับร้าน "{createdStore.storeName}"
-                </div>
-                <div style={{ fontSize: '12.5px', color: '#1B5E20' }}>
-                  ระบบได้สร้างฐานข้อมูลแยกเฉพาะสำหรับร้านของคุณเรียบร้อยแล้ว
-                </div>
-              </div>
-
-              {/* Security Key Box */}
-              <div style={{
-                backgroundColor: '#E3F2FD',
-                border: '2px dashed #1976D2',
-                borderRadius: '10px',
-                padding: '18px',
-                marginBottom: '20px',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '12.5px', fontWeight: 'bold', color: '#0D47A1', marginBottom: '6px' }}>
-                  รหัสความปลอดภัยสำหรับเชื่อมต่อโปรแกรม (Security Key / Store Code):
-                </div>
-                <div style={{
-                  fontFamily: 'Consolas, monospace',
-                  fontSize: 'clamp(24px, 6vw, 32px)',
-                  fontWeight: 'bold',
-                  color: '#1565C0',
-                  letterSpacing: '2px',
-                  marginBottom: '10px'
-                }}>
-                  {createdStore.storeCode}
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
-                  <span style={{ backgroundColor: '#E8F5E9', color: '#2E7D32', border: '1px solid #A5D6A7', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
-                    [ สิทธิ์ใช้งาน: ทดลองใช้ฟรี 14 วัน (เต็มทุกฟังก์ชัน) ]
-                  </span>
-                  <span style={{ backgroundColor: '#FFF3E0', color: '#E65100', border: '1px solid #FFE082', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
-                    [ ฐานข้อมูลแยกเฉพาะร้าน ]
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(createdStore.storeCode)}
-                  style={{
-                    padding: '8px 20px',
-                    borderRadius: '20px',
-                    border: 'none',
-                    backgroundColor: copiedKey ? '#2E7D32' : '#1976D2',
-                    color: '#FFF',
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {copiedKey ? 'คัดลอกรหัสแล้ว!' : 'คัดลอกรหัสความปลอดภัย'}
-                </button>
-              </div>
-
-              {/* How to Connect 3 Easy Steps */}
-              <div style={{
-                backgroundColor: '#F8F9FA',
-                border: '1px solid #E0E0E0',
-                borderRadius: '8px',
-                padding: '16px',
-                marginBottom: '20px',
-                fontSize: '13px'
-              }}>
-                <div style={{ fontWeight: 'bold', color: '#333', marginBottom: '10px', fontSize: '13.5px' }}>
-                  วิธีนำไปเชื่อมต่อกับโปรแกรม POS (3 ขั้นตอนง่ายๆ):
-                </div>
-                <ol style={{ margin: 0, paddingLeft: '20px', lineHeight: '1.8', color: '#444' }}>
-                  <li>
-                    เปิดโปรแกรม <strong>Restaurant POS</strong> บนเครื่องคอมพิวเตอร์ Windows หน้าร้าน
-                  </li>
-                  <li>
-                    ในหน้าต่างตั้งค่าการเชื่อมต่อ ให้กรอกรหัสร้าน: <strong style={{ color: '#1565C0' }}>{createdStore.storeCode}</strong> 
-                    {' '}และเซิร์ฟเวอร์: <code style={{ backgroundColor: '#E0E0E0', padding: '2px 5px', borderRadius: '3px' }}>https://spk.p-services.net</code>
-                  </li>
-                  <li>
-                    เข้าสู่ระบบด้วยชื่อผู้ใช้: <strong style={{ color: '#0D47A1' }}>admin</strong> (หรือเบอร์โทร: <strong style={{ color: '#0D47A1' }}>{ownerPhone || 'เบอร์ที่ลงทะเบียน'}</strong>) และรหัสผ่านที่คุณตั้งไว้ (<strong style={{ color: '#2E7D32' }}>{adminPassword}</strong>) เพื่อเริ่มขายอาหารได้ทันที!
-                  </li>
-                </ol>
-
-                <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #E0E0E0' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', marginBottom: '4px' }}>
-                    ลิงก์สำหรับให้ลูกค้าสแกนสั่งอาหารประจำโต๊ะ (โต๊ะ 1):
-                  </div>
-                  <div style={{
-                    padding: '8px 10px',
-                    backgroundColor: '#FFF',
-                    border: '1px solid #DDD',
-                    borderRadius: '4px',
-                    fontFamily: 'monospace',
-                    fontSize: '12px',
-                    wordBreak: 'break-all',
-                    color: '#1565C0',
-                    marginBottom: '8px'
-                  }}>
-                    {window.location.origin}/?store={createdStore.storeCode}&amp;table=T01
-                  </div>
-                  <div style={{ fontSize: '11.5px', color: '#666' }}>
-                    * ในโปรแกรม POS หน้าร้าน คุณสามารถสั่งพิมพ์สติ๊กเกอร์ QR Code ติดโต๊ะสำหรับโต๊ะต่างๆ ได้อัตโนมัติ
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <a
-                  href={`/?store=${createdStore.storeCode}&table=T01`}
-                  style={{
-                    display: 'block',
-                    textAlign: 'center',
-                    padding: '12px',
-                    borderRadius: '6px',
-                    backgroundColor: '#2E7D32',
-                    color: '#FFF',
-                    fontWeight: 'bold',
-                    fontSize: '14px',
-                    textDecoration: 'none'
-                  }}
-                >
-                  ทดลองเปิดหน้าสั่งอาหารของร้านนี้ (โต๊ะ T01)
-                </a>
-
-                <a
-                  href={`/?store=${createdStore.storeCode}&view=qr`}
-                  style={{
-                    display: 'block',
-                    textAlign: 'center',
-                    padding: '12px',
-                    borderRadius: '6px',
-                    backgroundColor: '#0D47A1',
-                    color: '#FFF',
-                    fontWeight: 'bold',
-                    fontSize: '14px',
-                    textDecoration: 'none'
-                  }}
-                >
-                  [ พิมพ์ป้าย QR Code ติดโต๊ะอาหาร ]
-                </a>
-
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStoredTenantCode(createdStore.storeCode);
-                    onOpenLogin(createdStore.storeCode);
-                  }}
-                  style={{
-                    padding: '12px',
-                    borderRadius: '6px',
-                    border: '1px solid #1976D2',
-                    backgroundColor: '#FFF',
-                    color: '#1976D2',
-                    fontWeight: 'bold',
-                    fontSize: '14px'
-                  }}
-                >
-                  เข้าสู่ระบบจัดการร้านบนเว็บ (Login)
-                </button>
-
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  style={{
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: '#F5F5F5',
-                    color: '#666',
-                    fontSize: '12.5px'
-                  }}
-                >
-                  + ลงทะเบียนร้านอื่นเพิ่มเติม
-                </button>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              {error && (
-                <div style={{
-                  backgroundColor: '#FFEBEE',
-                  border: '1px solid #FFCDD2',
-                  color: '#C62828',
-                  padding: '10px 14px',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  marginBottom: '16px',
-                  fontWeight: 600
-                }}>
-                  {error}
-                </div>
-              )}
-
-              {/* Store Name Field */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', display: 'block', marginBottom: '6px' }}>
-                  ชื่อร้านอาหารของคุณ: <span style={{ color: '#D32F2F' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="เช่น ร้านครัวริมน้ำ, ข้าวมันไก่สยาม"
-                  value={storeName}
-                  onChange={(e) => setStoreName(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #B0BEC5',
-                    fontSize: '14px',
-                    backgroundColor: '#FAFAFA'
-                  }}
-                />
-              </div>
-
-              {/* Owner Phone Field */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', display: 'block', marginBottom: '6px' }}>
-                  เบอร์โทรศัพท์ติดต่อ: <span style={{ color: '#D32F2F' }}>*</span>
-                </label>
-                <input
-                  type="tel"
-                  placeholder="เช่น 081-234-5678"
-                  value={ownerPhone}
-                  onChange={(e) => setOwnerPhone(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #B0BEC5',
-                    fontSize: '14px',
-                    backgroundColor: '#FAFAFA'
-                  }}
-                />
-              </div>
-
-              {/* Owner Name & Admin Password Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '16px' }}>
-                <div>
-                  <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', display: 'block', marginBottom: '6px' }}>
-                    ชื่อเจ้าของร้าน / ผู้ดูแล:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="เช่น คุณสมชาย"
-                    value={ownerName}
-                    onChange={(e) => setOwnerName(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid #B0BEC5',
-                      fontSize: '14px',
-                      backgroundColor: '#FAFAFA'
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', display: 'block', marginBottom: '6px' }}>
-                    รหัสผ่านสำหรับเข้า POS:
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="ค่าเริ่มต้น 123456"
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid #B0BEC5',
-                      fontSize: '14px',
-                      backgroundColor: '#FAFAFA'
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Security Key / Store Code Field */}
-              <div style={{
-                backgroundColor: '#F1F8E9',
-                border: '1px solid #C5E1A5',
-                borderRadius: '8px',
-                padding: '14px',
-                marginBottom: '20px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#2E7D32' }}>
-                    รหัสความปลอดภัยสำหรับเชื่อมต่อ (Store Code):
-                  </label>
-                  <button
-                    type="button"
-                    onClick={randomizeCode}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '4px',
-                      border: '1px solid #81C784',
-                      backgroundColor: '#FFF',
-                      color: '#2E7D32',
-                      fontSize: '11.5px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    สุ่มรหัสใหม่
-                  </button>
-                </div>
-
-                <input
-                  type="text"
-                  value={storeCode}
-                  onChange={(e) => setStoreCode(e.target.value.toUpperCase())}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #A5D6A7',
-                    fontSize: '16px',
-                    fontFamily: 'Consolas, monospace',
-                    fontWeight: 'bold',
-                    color: '#1B5E20',
-                    backgroundColor: '#FFF',
-                    letterSpacing: '1px'
-                  }}
-                />
-                <div style={{ fontSize: '11.5px', color: '#2E7D32', marginTop: '6px', lineHeight: '1.5' }}>
-                  * รหัสความปลอดภัยความยาวสูง (รูปแบบ RPOS-XXXX-XXXX-XXXX) เพื่อความปลอดภัยสูงสุด ป้องกันการสุ่มเดา พร้อมสิทธิ์ทดลองใช้งานฟรี 14 วันเต็มรูปแบบ
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: '#0D47A1',
-                  color: '#FFF',
-                  fontSize: '15px',
-                  fontWeight: 'bold',
-                  boxShadow: '0 3px 10px rgba(13, 71, 161, 0.3)',
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                  opacity: isSubmitting ? 0.75 : 1
-                }}
-              >
-                {isSubmitting ? 'กำลังลงทะเบียนร้านค้า...' : 'ลงทะเบียนและรับรหัสความปลอดภัยทันที'}
-              </button>
-            </form>
-          )}
-        </div>
-      </section>
-
-      {/* Workflow & Architecture Concept Section */}
-      <section style={{
-        maxWidth: '960px',
-        margin: '0 auto 40px auto',
-        padding: '0 10px'
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0D47A1', marginBottom: '6px' }}>
-            โฟลวการทำงานของระบบ Restaurant POS
-          </h2>
-          <p style={{ fontSize: '13px', color: '#546E7A', margin: 0 }}>
-            ขั้นตอนง่ายๆ ตั้งแต่ลงทะเบียน เชื่อมต่อโปรแกรม จนถึงลูกค้าสแกนสั่งอาหาร
-          </p>
-        </div>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-          gap: '14px',
-          marginBottom: '24px'
-        }}>
-          {/* Step 1 */}
-          <div style={{
-            backgroundColor: '#FFF',
-            border: '1px solid #E0E0E0',
-            borderRadius: '8px',
-            padding: '16px',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-          }}>
-            <div style={{
+          <a
+            href="/?store=DEFAULT&amp;table=T01"
+            style={{
               display: 'inline-block',
-              backgroundColor: '#E3F2FD',
-              color: '#1565C0',
-              padding: '3px 8px',
-              borderRadius: '4px',
-              fontSize: '11.5px',
+              padding: '10px 24px',
+              backgroundColor: '#303F9F',
+              color: '#FFF',
+              textDecoration: 'none',
+              borderRadius: '6px',
               fontWeight: 'bold',
-              marginBottom: '8px'
-            }}>
-              ขั้นตอนที่ 1
-            </div>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
-              ลงทะเบียนรับรหัส
-            </div>
-            <div style={{ fontSize: '12.5px', color: '#666', lineHeight: '1.5' }}>
-              สมัครสมาชิกบนหน้าเว็บเพื่อรับรหัสความปลอดภัย (Security Key) ประจำร้านของคุณ
-            </div>
-          </div>
-
-          {/* Step 2 */}
-          <div style={{
-            backgroundColor: '#FFF',
-            border: '1px solid #E0E0E0',
-            borderRadius: '8px',
-            padding: '16px',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-          }}>
-            <div style={{
-              display: 'inline-block',
-              backgroundColor: '#E8F5E9',
-              color: '#2E7D32',
-              padding: '3px 8px',
-              borderRadius: '4px',
-              fontSize: '11.5px',
-              fontWeight: 'bold',
-              marginBottom: '8px'
-            }}>
-              ขั้นตอนที่ 2
-            </div>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
-              เชื่อมต่อโปรแกรม POS
-            </div>
-            <div style={{ fontSize: '12.5px', color: '#666', lineHeight: '1.5' }}>
-              นำรหัสที่ได้ไปกรอกในโปรแกรม Restaurant POS บนเครื่องคอมพิวเตอร์ Windows หน้าร้าน
-            </div>
-          </div>
-
-          {/* Step 3 */}
-          <div style={{
-            backgroundColor: '#FFF',
-            border: '1px solid #E0E0E0',
-            borderRadius: '8px',
-            padding: '16px',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-          }}>
-            <div style={{
-              display: 'inline-block',
-              backgroundColor: '#FFF3E0',
-              color: '#E65100',
-              padding: '3px 8px',
-              borderRadius: '4px',
-              fontSize: '11.5px',
-              fontWeight: 'bold',
-              marginBottom: '8px'
-            }}>
-              ขั้นตอนที่ 3
-            </div>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
-              พิมพ์ QR Code ติดโต๊ะ
-            </div>
-            <div style={{ fontSize: '12.5px', color: '#666', lineHeight: '1.5' }}>
-              โปรแกรม POS จะพิมพ์สติ๊กเกอร์ QR Code ประจำแต่ละโต๊ะให้ลูกค้านั่งที่ร้านสแกนสั่ง
-            </div>
-          </div>
-
-          {/* Step 4 */}
-          <div style={{
-            backgroundColor: '#FFF',
-            border: '1px solid #E0E0E0',
-            borderRadius: '8px',
-            padding: '16px',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-          }}>
-            <div style={{
-              display: 'inline-block',
-              backgroundColor: '#F3E5F5',
-              color: '#6A1B9A',
-              padding: '3px 8px',
-              borderRadius: '4px',
-              fontSize: '11.5px',
-              fontWeight: 'bold',
-              marginBottom: '8px'
-            }}>
-              ขั้นตอนที่ 4
-            </div>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
-              รับออเดอร์ &amp; ตัดสต็อก
-            </div>
-            <div style={{ fontSize: '12.5px', color: '#666', lineHeight: '1.5' }}>
-              ลูกค้าสแกนสั่งจากมือถือ ออเดอร์เด้งเข้าหน้าแคชเชียร์และจอครัว KDS อัตโนมัติทันที
-            </div>
-          </div>
-        </div>
-
-        {/* Important Platform Clarification Notice */}
-        <div style={{
-          backgroundColor: '#FFFDE7',
-          border: '1px solid #FFF59D',
-          borderRadius: '8px',
-          padding: '14px 18px',
-          fontSize: '13px',
-          color: '#F57F17',
-          lineHeight: '1.6'
-        }}>
-          <strong>[ ข้อชี้แจงสำคัญ ]</strong> เราคือผู้พัฒนาซอฟต์แวร์ระบบขายหน้าร้าน (POS) 
-          และไม่ใช่แพลตฟอร์มสั่งอาหารเดลิเวอรี่ส่วนกลางที่รวมทุกร้านค้าเข้าด้วยกัน 
-          แต่ละร้านค้าจะมีรหัสความปลอดภัยและลิงก์ QR Code แยกออกจากกันอย่างเป็นส่วนตัว 
-          ลูกค้าของร้านจะเห็นเฉพาะเมนูของร้านนั้นๆ เมื่อสแกน QR Code ประจำโต๊ะที่ร้านจัดเตรียมไว้ให้เท่านั้น
-        </div>
-      </section>
-
-      {/* Feature Showcase Grid */}
-      <section style={{
-        maxWidth: '960px',
-        margin: '0 auto 40px auto',
-        padding: '0 10px'
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0D47A1', marginBottom: '6px' }}>
-            จุดเด่นสำคัญของ Restaurant POS
-          </h2>
-          <p style={{ fontSize: '13px', color: '#546E7A', margin: 0 }}>
-            ออกแบบมาเพื่อร้านอาหารขนาดเล็กจนถึงร้านอาหารขนาดใหญ่
-          </p>
-        </div>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '16px'
-        }}>
-          {/* Card 1 */}
-          <div style={{
-            backgroundColor: '#FFF',
-            border: '1px solid #E0E0E0',
-            borderRadius: '8px',
-            padding: '18px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-          }}>
-            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#0D47A1', marginBottom: '6px' }}>
-              [ โปรแกรม Windows Desktop POS ]
-            </div>
-            <p style={{ fontSize: '13px', color: '#555', margin: 0, lineHeight: '1.6' }}>
-              สไตล์ Classic รวดเร็ว แม่นยำ ไม่หน่วง รองรับเครื่องพิมพ์สลิปความร้อน (ESC/POS) 
-              สั่งพิมพ์ใบเสร็จและใบแจ้งครัวแยกตามสเตชั่น คุมสถานะโต๊ะ เช็คบิล และปิดกะรายวัน
-            </p>
-          </div>
-
-          {/* Card 2 */}
-          <div style={{
-            backgroundColor: '#FFF',
-            border: '1px solid #E0E0E0',
-            borderRadius: '8px',
-            padding: '18px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-          }}>
-            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1565C0', marginBottom: '6px' }}>
-              [ QR Code สั่งอาหารประจำโต๊ะ ]
-            </div>
-            <p style={{ fontSize: '13px', color: '#555', margin: 0, lineHeight: '1.6' }}>
-              ลูกค้านั่งที่โต๊ะเปิดกล้องมือถือสแกนสั่งอาหารได้ทันที โดยไม่ต้องดาวน์โหลดแอปพลิเคชัน 
-              ลดภาระพนักงานเสิร์ฟและลดความผิดพลาดในการจดรายการอาหาร
-            </p>
-          </div>
-
-          {/* Card 3 */}
-          <div style={{
-            backgroundColor: '#FFF',
-            border: '1px solid #E0E0E0',
-            borderRadius: '8px',
-            padding: '18px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-          }}>
-            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#2E7D32', marginBottom: '6px' }}>
-              [ จอแสดงออเดอร์ในครัว KDS ]
-            </div>
-            <p style={{ fontSize: '13px', color: '#555', margin: 0, lineHeight: '1.6' }}>
-              หน้าจอสำหรับแผนกครัวและบาร์น้ำ อัปเดตออเดอร์ใหม่แบบเรียลไทม์ผ่าน SignalR 
-              พร้อมเสียงเตือนอัตโนมัติ กดรับออเดอร์และแจ้งอาหารปรุงเสร็จได้อย่างรวดเร็ว
-            </p>
-          </div>
-
-          {/* Card 4 */}
-          <div style={{
-            backgroundColor: '#FFF',
-            border: '1px solid #E0E0E0',
-            borderRadius: '8px',
-            padding: '18px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-          }}>
-            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#E65100', marginBottom: '6px' }}>
-              [ ระบบตัดสต็อก &amp; รายงานยอดขาย ]
-            </div>
-            <p style={{ fontSize: '13px', color: '#555', margin: 0, lineHeight: '1.6' }}>
-              ตัดสต็อกวัตถุดิบอัตโนมัติตามสัดส่วนที่ตั้งไว้ในเมนู พร้อมรายงานยอดขายรายวัน 
-              สรุปช่วงเวลาขายดี และประวัติการทำรายการอย่างครบถ้วน
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Demo Callout Banner */}
-      <section style={{
-        maxWidth: '800px',
-        margin: '0 auto',
-        backgroundColor: '#E8EAF6',
-        border: '1px solid #C5CAE9',
-        borderRadius: '10px',
-        padding: '20px',
-        textAlign: 'center'
-      }}>
-        <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#283593', marginBottom: '6px' }}>
-          ต้องการทดสอบระบบสั่งอาหารของลูกค้าจำลองใช่หรือไม่?
-        </div>
-        <p style={{ fontSize: '13px', color: '#3949AB', marginBottom: '14px' }}>
-          คุณสามารถทดลองใช้งานระบบสั่งอาหารผ่าน QR Code ในมุมมองของลูกค้าที่นั่งโต๊ะ 1 ได้ทันที
-        </p>
-        <a
-          href="/?store=DEFAULT&amp;table=T01"
-          style={{
-            display: 'inline-block',
-            padding: '10px 24px',
-            backgroundColor: '#303F9F',
-            color: '#FFF',
-            textDecoration: 'none',
-            borderRadius: '6px',
-            fontWeight: 'bold',
-            fontSize: '13.5px'
-          }}
-        >
-          ทดลองเปิดหน้าสั่งอาหารของร้านตัวอย่าง (DEMO Store)
-        </a>
-      </section>
+              fontSize: '13.5px'
+            }}
+          >
+            ทดลองเปิดหน้าสั่งอาหารของร้านตัวอย่าง (DEMO Store)
+          </a>
+        </section>
+      </div>
     </div>
   );
 }

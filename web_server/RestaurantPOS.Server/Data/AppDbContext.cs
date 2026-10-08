@@ -53,7 +53,24 @@ public class AppDbContext : DbContext
         return Convert.ToBase64String(bytes);
     }
 
+    private static readonly object _seedLock = new();
+
     public void SeedInitialData(string? customAdminUser = null, string? customAdminPassword = null, string? storeName = null, bool isDemoStore = false)
+    {
+        lock (_seedLock)
+        {
+            try
+            {
+                SeedInitialDataInternal(customAdminUser, customAdminPassword, storeName, isDemoStore);
+            }
+            catch (Exception)
+            {
+                // Concurrently seeded by another thread, safe to ignore
+            }
+        }
+    }
+
+    private void SeedInitialDataInternal(string? customAdminUser, string? customAdminPassword, string? storeName, bool isDemoStore)
     {
         var adminUsername = string.IsNullOrWhiteSpace(customAdminUser) ? "admin" : customAdminUser.Trim();
         var adminPassword = string.IsNullOrWhiteSpace(customAdminPassword) ? "psoft123" : customAdminPassword.Trim();
@@ -127,47 +144,58 @@ public class AppDbContext : DbContext
 
             Categories.AddRange(catMain, catSnack, catDrink, catDessert);
             SaveChanges();
+        }
 
-            var products = new List<ProductEntity>
+        if (!Products.Any())
+        {
+            var catMain = Categories.FirstOrDefault(c => c.Name == "อาหารจานหลัก");
+            var catSnack = Categories.FirstOrDefault(c => c.Name == "ของทานเล่น");
+            var catDrink = Categories.FirstOrDefault(c => c.Name == "เครื่องดื่ม");
+            var catDessert = Categories.FirstOrDefault(c => c.Name == "ของหวาน");
+
+            if (catMain != null && catSnack != null && catDrink != null && catDessert != null)
             {
-                new() { CategoryId = catMain.Id, Code = "M01", Name = "ผัดไทยกุ้งสด", Price = 85.00m, ImageUrl = "/uploads/menu/m01_padthai.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
-                new() { CategoryId = catMain.Id, Code = "M02", Name = "ข้าวผัดกระเพราหมูกรอบ", Price = 75.00m, ImageUrl = "/uploads/menu/m02_krapao.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
-                new() { CategoryId = catMain.Id, Code = "M03", Name = "ต้มยำกุ้งน้ำข้น", Price = 150.00m, ImageUrl = "/uploads/menu/m03_tomyum.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
-                new() { CategoryId = catMain.Id, Code = "M04", Name = "แกงเขียวหวานไก่โรตี", Price = 95.00m, ImageUrl = "/uploads/menu/m04_greencurry.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
-                
-                new() { CategoryId = catSnack.Id, Code = "S01", Name = "ปีกไก่ทอดน้ำปลา", Price = 80.00m, ImageUrl = "/uploads/menu/s01_wings.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
-                new() { CategoryId = catSnack.Id, Code = "S02", Name = "เปาะเปี๊ยะทอด", Price = 60.00m, ImageUrl = "/uploads/menu/s02_springrolls.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
-                new() { CategoryId = catSnack.Id, Code = "S03", Name = "เฟรนช์ฟรายส์", Price = 55.00m, ImageUrl = "/uploads/menu/s03_fries.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
-
-                new() { CategoryId = catDrink.Id, Code = "D01", Name = "ชาไทยเย็น", Price = 45.00m, ImageUrl = "/uploads/menu/d01_thaitea.jpg", TrackStock = false, KitchenStation = "Bar" },
-                new() { CategoryId = catDrink.Id, Code = "D02", Name = "กาแฟโบราณ", Price = 45.00m, ImageUrl = "/uploads/menu/d02_thaicoffee.jpg", TrackStock = false, KitchenStation = "Bar" },
-                new() { CategoryId = catDrink.Id, Code = "D03", Name = "น้ำมะนาวโซดา", Price = 50.00m, ImageUrl = "/uploads/menu/d03_limesoda.jpg", TrackStock = false, KitchenStation = "Bar" },
-                new() { CategoryId = catDrink.Id, Code = "D04", Name = "น้ำดื่มบริสุทธิ์", Price = 15.00m, ImageUrl = "/uploads/menu/d04_water.jpg", TrackStock = false, KitchenStation = "Bar" },
-
-                new() { CategoryId = catDessert.Id, Code = "DS01", Name = "ข้าวเหนียวมะม่วง", Price = 89.00m, ImageUrl = "/uploads/menu/ds01_mangorice.jpg", TrackStock = false, KitchenStation = "Dessert" },
-                new() { CategoryId = catDessert.Id, Code = "DS02", Name = "บัวลอยไข่หวาน", Price = 50.00m, ImageUrl = "/uploads/menu/ds02_bualoy.jpg", TrackStock = false, KitchenStation = "Dessert" }
-            };
-
-            Products.AddRange(products);
-            SaveChanges();
-
-            // Add options to Tea
-            var tea = products.First(p => p.Code == "D01");
-            var sweetGroup = new ProductOptionGroupEntity
-            {
-                ProductId = tea.Id,
-                Name = "ระดับความหวาน",
-                IsRequired = true,
-                AllowMultiple = false,
-                Options = new List<ProductOptionItemEntity>
+                var products = new List<ProductEntity>
                 {
-                    new() { Name = "หวาน 100% (ปกติ)", ExtraPrice = 0 },
-                    new() { Name = "หวานน้อย 50%", ExtraPrice = 0 },
-                    new() { Name = "ไม่หวาน 0%", ExtraPrice = 0 }
-                }
-            };
-            ProductOptionGroups.Add(sweetGroup);
-            SaveChanges();
+                    new() { CategoryId = catMain.Id, Code = "M01", Name = "ผัดไทยกุ้งสด", Price = 85.00m, ImageUrl = "/uploads/menu/m01_padthai.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
+                    new() { CategoryId = catMain.Id, Code = "M02", Name = "ข้าวผัดกระเพราหมูกรอบ", Price = 75.00m, ImageUrl = "/uploads/menu/m02_krapao.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
+                    new() { CategoryId = catMain.Id, Code = "M03", Name = "ต้มยำกุ้งน้ำข้น", Price = 150.00m, ImageUrl = "/uploads/menu/m03_tomyum.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
+                    new() { CategoryId = catMain.Id, Code = "M04", Name = "แกงเขียวหวานไก่โรตี", Price = 95.00m, ImageUrl = "/uploads/menu/m04_greencurry.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
+                    
+                    new() { CategoryId = catSnack.Id, Code = "S01", Name = "ปีกไก่ทอดน้ำปลา", Price = 80.00m, ImageUrl = "/uploads/menu/s01_wings.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
+                    new() { CategoryId = catSnack.Id, Code = "S02", Name = "เปาะเปี๊ยะทอด", Price = 60.00m, ImageUrl = "/uploads/menu/s02_springrolls.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
+                    new() { CategoryId = catSnack.Id, Code = "S03", Name = "เฟรนช์ฟรายส์", Price = 55.00m, ImageUrl = "/uploads/menu/s03_fries.jpg", TrackStock = false, KitchenStation = "MainKitchen" },
+
+                    new() { CategoryId = catDrink.Id, Code = "D01", Name = "ชาไทยเย็น", Price = 45.00m, ImageUrl = "/uploads/menu/d01_thaitea.jpg", TrackStock = false, KitchenStation = "Bar" },
+                    new() { CategoryId = catDrink.Id, Code = "D02", Name = "กาแฟโบราณ", Price = 45.00m, ImageUrl = "/uploads/menu/d02_thaicoffee.jpg", TrackStock = false, KitchenStation = "Bar" },
+                    new() { CategoryId = catDrink.Id, Code = "D03", Name = "น้ำมะนาวโซดา", Price = 50.00m, ImageUrl = "/uploads/menu/d03_limesoda.jpg", TrackStock = false, KitchenStation = "Bar" },
+                    new() { CategoryId = catDrink.Id, Code = "D04", Name = "น้ำดื่มบริสุทธิ์", Price = 15.00m, ImageUrl = "/uploads/menu/d04_water.jpg", TrackStock = false, KitchenStation = "Bar" },
+
+                    new() { CategoryId = catDessert.Id, Code = "DS01", Name = "ข้าวเหนียวมะม่วง", Price = 89.00m, ImageUrl = "/uploads/menu/ds01_mangorice.jpg", TrackStock = false, KitchenStation = "Dessert" },
+                    new() { CategoryId = catDessert.Id, Code = "DS02", Name = "บัวลอยไข่หวาน", Price = 50.00m, ImageUrl = "/uploads/menu/ds02_bualoy.jpg", TrackStock = false, KitchenStation = "Dessert" }
+                };
+
+                Products.AddRange(products);
+                SaveChanges();
+
+                // Add options to Tea
+                var tea = products.First(p => p.Code == "D01");
+                var sweetGroup = new ProductOptionGroupEntity
+                {
+                    ProductId = tea.Id,
+                    Name = "ระดับความหวาน",
+                    IsRequired = true,
+                    AllowMultiple = false,
+                    Options = new List<ProductOptionItemEntity>
+                    {
+                        new() { Name = "หวาน 100% (ปกติ)", ExtraPrice = 0 },
+                        new() { Name = "หวานน้อย 50%", ExtraPrice = 0 },
+                        new() { Name = "ไม่หวาน 0%", ExtraPrice = 0 }
+                    }
+                };
+                ProductOptionGroups.Add(sweetGroup);
+                SaveChanges();
+            }
         }
 
         // Ensure default images are assigned to existing products

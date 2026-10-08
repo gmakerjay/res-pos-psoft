@@ -15,6 +15,12 @@ export interface TableItem {
   status: number; // 0=Available, 1=Occupied, 2=Reserved, 3=Billing
   currentOrderId?: number;
   currentBillAmount: number;
+  seatedAt?: string;
+  reservationCustomerName?: string;
+  reservationCustomerPhone?: string;
+  reservationTime?: string;
+  reservationPartySize?: number;
+  reservationNotes?: string;
 }
 
 export interface CategoryItem {
@@ -155,6 +161,7 @@ export interface RegisterStorePayload {
   email?: string;
   adminUsername?: string;
   adminPassword?: string;
+  confirmPassword?: string;
   address?: string;
 }
 
@@ -392,6 +399,38 @@ export async function deleteTable(id: number): Promise<boolean> {
   });
 }
 
+export async function reserveTable(id: number, payload: {
+  customerName: string;
+  customerPhone: string;
+  reservationTime: string;
+  partySize: number;
+  notes?: string;
+}): Promise<TableItem> {
+  return request<TableItem>(`/api/tables/${id}/reserve`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function checkInTable(id: number): Promise<TableItem> {
+  return request<TableItem>(`/api/tables/${id}/check-in`, {
+    method: 'POST'
+  });
+}
+
+export async function cancelTableReservation(id: number): Promise<TableItem> {
+  return request<TableItem>(`/api/tables/${id}/cancel-reservation`, {
+    method: 'POST'
+  });
+}
+
+export async function updateTableStatus(id: number, status: number): Promise<TableItem> {
+  return request<TableItem>(`/api/tables/${id}/status`, {
+    method: 'POST',
+    body: JSON.stringify(status)
+  });
+}
+
 
 export async function getCategories(): Promise<CategoryItem[]> {
   return request<CategoryItem[]>('/api/categories');
@@ -548,4 +587,32 @@ export async function getAuditLogs(limit: number = 50): Promise<AuditLogItem[]> 
 export async function getDailyReport(date?: string): Promise<any> {
   const query = date ? `?date=${date}` : '';
   return request<any>(`/api/reports/daily${query}`);
+}
+
+export async function exportStoreBackup(): Promise<any> {
+  return request<any>('/api/backup/export');
+}
+
+export async function downloadStoreBackup(): Promise<void> {
+  const token = getStoredToken();
+  const tenantCode = getStoredTenantCode() || 'DEFAULT';
+  const url = `${getServerUrl()}/api/backup/export?download=true`;
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': token ? `Bearer ${token}` : '',
+      'X-Tenant-Code': tenantCode
+    }
+  });
+  if (!response.ok) {
+    throw new Error('ไม่สามารถดาวน์โหลดไฟล์สำรองข้อมูลได้');
+  }
+  const blob = await response.blob();
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  a.download = `RestaurantPOS_Backup_${tenantCode}_${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(downloadUrl);
 }

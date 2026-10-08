@@ -234,6 +234,27 @@ public class StoresController : ControllerBase
         return Ok(ApiResponse<List<TenantDto>>.Ok(list));
     }
 
+    [HttpPost("reset-clean")]
+    public async Task<ActionResult<ApiResponse<object>>> ResetAllStoresExceptDefault()
+    {
+        if (!IsDevAuthorized())
+        {
+            return Unauthorized(ApiResponse<object>.Fail("ไม่อนุญาต: ต้องใช้สิทธิ์นักพัฒนาในการรีเซ็ตล้างข้อมูลร้านค้า", ErrorCodes.Unauthorized));
+        }
+
+        try
+        {
+            var count = await _tenantService.ResetAllStoresExceptDefaultAsync();
+            return Ok(ApiResponse<object>.Ok(new { deletedCount = count, preservedStore = "DEFAULT" }, $"รีเซ็ตระบบและลบร้านค้าทดสอบทั้งหมด {count} ร้านเรียบร้อยแล้ว คงเหลือเฉพาะร้านค้าตัวอย่าง (DEFAULT)"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Stores] Error resetting stores");
+            return StatusCode(500, ApiResponse<object>.Fail("เกิดข้อผิดพลาดในการรีเซ็ตร้านค้า: " + ex.Message, ErrorCodes.ServerError));
+        }
+    }
+
+
     [HttpPost("license/upgrade")]
     public async Task<ActionResult<ApiResponse<TenantDto>>> UpgradeLicense([FromBody] UpgradeLicenseRequest request)
     {

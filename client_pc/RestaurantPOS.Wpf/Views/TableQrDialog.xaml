@@ -74,9 +74,10 @@
                                         <TextBlock Grid.Column="0" Text="{Binding TableNumber}" 
                                                    FontWeight="Bold" FontSize="13" Foreground="#0D47A1" 
                                                    Width="50" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding Name}" 
-                                                   FontSize="12" Foreground="#333" 
-                                                   VerticalAlignment="Center" Margin="5,0"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0">
+                                            <TextBlock Text="{Binding Name}" FontSize="12" Foreground="#333"/>
+                                            <TextBlock Text="{Binding StatusBadge}" FontSize="10.5" FontWeight="Bold" Foreground="#64748B"/>
+                                        </StackPanel>
                                         <TextBlock Grid.Column="2" Text="{Binding Capacity, StringFormat='{}{0} ที่นั่ง'}" 
                                                    FontSize="11" Foreground="#777" 
                                                    VerticalAlignment="Center"/>

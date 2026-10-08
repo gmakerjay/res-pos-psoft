@@ -57,13 +57,18 @@ public class TenantService : ITenantService
         return new AppDbContext(optionsBuilder.Options);
     }
 
+    private static readonly SemaphoreSlim _initLock = new(1, 1);
+
     public async Task EnsureMasterAndDefaultTenantAsync()
     {
-        Directory.CreateDirectory("tenants");
+        await _initLock.WaitAsync();
+        try
+        {
+            Directory.CreateDirectory("tenants");
 
-        using var scope = _serviceProvider.CreateScope();
-        var masterDb = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
-        await masterDb.Database.EnsureCreatedAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var masterDb = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+            await masterDb.Database.EnsureCreatedAsync();
 
         // 1. Ensure DEFAULT tenant in Master DB
         var defaultTenant = await masterDb.Tenants.FirstOrDefaultAsync(t => t.StoreCode == "DEFAULT");
@@ -104,8 +109,71 @@ public class TenantService : ITenantService
 
         using var defaultDb = CreateTenantDbContext("DEFAULT");
         await defaultDb.Database.EnsureCreatedAsync();
-        try { await defaultDb.Database.ExecuteSqlRawAsync("ALTER TABLE Orders ADD COLUMN TableNumber TEXT;"); } catch { }
+        await MigrateTenantDbAsync(defaultDb, _dbProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase));
         defaultDb.SeedInitialData("admin", "psoft123", "ร้านหลัก", isDemoStore: true);
+
+        // Migrate all existing tenants if any
+        var allTenants = await masterDb.Tenants.ToListAsync();
+        foreach (var t in allTenants)
+        {
+            if (t.StoreCode == "DEFAULT") continue;
+            try
+            {
+                using var tDb = CreateTenantDbContext(t.StoreCode);
+                await tDb.Database.EnsureCreatedAsync();
+                await MigrateTenantDbAsync(tDb, _dbProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Tenancy] Could not migrate tenant db for {StoreCode}", t.StoreCode);
+            }
+        }
+        }
+        finally
+        {
+            _initLock.Release();
+        }
+    }
+
+    public static async Task MigrateTenantDbAsync(AppDbContext tenantDb, bool isPostgres)
+    {
+        string[] alterStatements;
+        if (isPostgres)
+        {
+            alterStatements = new[]
+            {
+                "ALTER TABLE \"Orders\" ADD COLUMN IF NOT EXISTS \"TableNumber\" text;",
+                "ALTER TABLE \"Tables\" ADD COLUMN IF NOT EXISTS \"ReservationCustomerName\" text;",
+                "ALTER TABLE \"Tables\" ADD COLUMN IF NOT EXISTS \"ReservationCustomerPhone\" text;",
+                "ALTER TABLE \"Tables\" ADD COLUMN IF NOT EXISTS \"ReservationTime\" timestamp with time zone;",
+                "ALTER TABLE \"Tables\" ADD COLUMN IF NOT EXISTS \"ReservationPartySize\" integer;",
+                "ALTER TABLE \"Tables\" ADD COLUMN IF NOT EXISTS \"ReservationNotes\" text;"
+            };
+        }
+        else
+        {
+            alterStatements = new[]
+            {
+                "ALTER TABLE Orders ADD COLUMN TableNumber TEXT;",
+                "ALTER TABLE Tables ADD COLUMN ReservationCustomerName TEXT;",
+                "ALTER TABLE Tables ADD COLUMN ReservationCustomerPhone TEXT;",
+                "ALTER TABLE Tables ADD COLUMN ReservationTime TEXT;",
+                "ALTER TABLE Tables ADD COLUMN ReservationPartySize INTEGER;",
+                "ALTER TABLE Tables ADD COLUMN ReservationNotes TEXT;"
+            };
+        }
+
+        foreach (var sql in alterStatements)
+        {
+            try
+            {
+                await tenantDb.Database.ExecuteSqlRawAsync(sql);
+            }
+            catch
+            {
+                // Ignored if column already exists or already up-to-date
+            }
+        }
     }
 
     public async Task<TenantEntity?> GetTenantAsync(string storeCode)
@@ -162,8 +230,18 @@ public class TenantService : ITenantService
             throw new InvalidOperationException($"รหัสร้านค้า '{code}' มีอยู่ในระบบแล้ว กรุณาเลือกรหัสร้านค้าใหม่");
         }
 
+        if (string.IsNullOrWhiteSpace(request.AdminPassword) || request.AdminPassword.Trim().Length < 4)
+        {
+            throw new ArgumentException("กรุณากำหนดรหัสผ่านสำหรับเข้าสู่ระบบอย่างน้อย 4 ตัวอักษร");
+        }
+
+        if (!string.IsNullOrEmpty(request.ConfirmPassword) && request.AdminPassword.Trim() != request.ConfirmPassword.Trim())
+        {
+            throw new ArgumentException("รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง");
+        }
+
         var adminUser = string.IsNullOrWhiteSpace(request.AdminUsername) ? "admin" : request.AdminUsername.Trim();
-        var adminPass = string.IsNullOrWhiteSpace(request.AdminPassword) ? "psoft123" : request.AdminPassword.Trim();
+        var adminPass = request.AdminPassword.Trim();
 
         var tenant = new TenantEntity
         {
@@ -188,7 +266,7 @@ public class TenantService : ITenantService
         using (var tenantDb = CreateTenantDbContext(code))
         {
             await tenantDb.Database.EnsureCreatedAsync();
-            try { await tenantDb.Database.ExecuteSqlRawAsync("ALTER TABLE Orders ADD COLUMN TableNumber TEXT;"); } catch { }
+            await MigrateTenantDbAsync(tenantDb, _dbProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase));
             tenantDb.SeedInitialData(adminUser, adminPass, tenant.StoreName, isDemoStore: false);
             _logger.LogInformation("[Tenancy] Successfully initialized isolated database for store: {StoreCode}", code);
         }
@@ -425,4 +503,47 @@ public class TenantService : ITenantService
             SubscriptionPlan = tenant.SubscriptionPlan
         };
     }
+
+    public async Task<int> ResetAllStoresExceptDefaultAsync()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var masterDb = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+
+        var nonDefaultStores = await masterDb.Tenants
+            .Where(t => t.StoreCode != "DEFAULT")
+            .ToListAsync();
+
+        int deletedCount = 0;
+        foreach (var store in nonDefaultStores)
+        {
+            try
+            {
+                if (!_dbProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase))
+                {
+                    var dbFile = Path.Combine("tenants", $"{store.StoreCode}.db");
+                    if (File.Exists(dbFile)) File.Delete(dbFile);
+                    var shmFile = Path.Combine("tenants", $"{store.StoreCode}.db-shm");
+                    if (File.Exists(shmFile)) File.Delete(shmFile);
+                    var walFile = Path.Combine("tenants", $"{store.StoreCode}.db-wal");
+                    if (File.Exists(walFile)) File.Delete(walFile);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Tenancy] Could not remove physical DB file for store {StoreCode}", store.StoreCode);
+            }
+
+            masterDb.Tenants.Remove(store);
+            deletedCount++;
+        }
+
+        await masterDb.SaveChangesAsync();
+        _logger.LogInformation("[Tenancy] Cleaned up {Count} non-default stores. Preserved DEFAULT demo store.", deletedCount);
+
+        // Guarantee DEFAULT demo store has its full demo tables, categories, menu, and admin account
+        await EnsureMasterAndDefaultTenantAsync();
+
+        return deletedCount;
+    }
 }
+

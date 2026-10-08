@@ -21,13 +21,15 @@ public class ReportsController : ControllerBase
     [HttpGet("daily")]
     public async Task<ActionResult<ApiResponse<DailyReportSummaryDto>>> GetDailySummary([FromQuery] DateTime? date)
     {
-        var targetDate = (date ?? DateTime.UtcNow).Date;
-        var startOfDay = targetDate;
-        var endOfDay = targetDate.AddDays(1);
+        // Support local Thailand time (UTC+7) so business day (including evening orders 17:00-23:59) is accurately grouped
+        var localNow = DateTime.UtcNow.AddHours(7);
+        var targetDate = (date ?? localNow).Date;
+        var startUtc = targetDate.AddHours(-7); // Local midnight in UTC
+        var endUtc = startUtc.AddDays(1);
 
         var orders = await _db.Orders
             .Include(o => o.Items)
-            .Where(o => o.CreatedAt >= startOfDay && o.CreatedAt < endOfDay && o.Status == OrderStatus.Completed)
+            .Where(o => o.CreatedAt >= startUtc && o.CreatedAt < endUtc && o.Status == OrderStatus.Completed)
             .ToListAsync();
 
         var totalSales = orders.Sum(o => o.TotalAmount);

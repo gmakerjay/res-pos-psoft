@@ -209,10 +209,40 @@ public class OrdersController : ControllerBase
             }
         }
 
+        if (table != null)
+        {
+            table.Status = TableStatus.Occupied;
+            table.CurrentOrderId = order.Id;
+            table.SeatedAt ??= DateTime.UtcNow;
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Order] Failed to save table occupied status for Table {Table}", table.TableNumber);
+            }
+        }
+
         var dto = MapToDto(order);
 
         // 4. Real-time broadcast to POS, Tablet, and Kitchen (tenant-scoped)
         await _notifier.BroadcastAsync(HubEvents.OrderCreated, dto);
+
+        if (table != null)
+        {
+            var tableDto = new TableDto
+            {
+                Id = table.Id,
+                TableNumber = table.TableNumber,
+                Name = table.Name,
+                Capacity = table.Capacity,
+                Status = TableStatus.Occupied,
+                CurrentOrderId = order.Id,
+                CurrentBillAmount = order.TotalAmount
+            };
+            await _notifier.BroadcastAsync(HubEvents.TableStatusChanged, tableDto);
+        }
 
         _logger.LogInformation("[Order] New order created: {OrderNumber} | Table: {Table} | Total: {Total:N2} THB", 
             order.OrderNumber, table?.TableNumber ?? "Takeaway", order.TotalAmount);
@@ -317,6 +347,39 @@ public class OrdersController : ControllerBase
         // Broadcast status change and detailed action activity to POS and Web clients (tenant-scoped)
         await _notifier.BroadcastAsync(HubEvents.OrderStatusChanged, dto);
         await _notifier.BroadcastAsync(HubEvents.OrderActionActivity, actionActivity);
+
+        if (req.Status == OrderStatus.Completed)
+        {
+            await _notifier.BroadcastAsync(HubEvents.BillClosed, dto);
+            if (order.Table != null)
+            {
+                var tableDto = new TableDto
+                {
+                    Id = order.Table.Id,
+                    TableNumber = order.Table.TableNumber,
+                    Name = order.Table.Name,
+                    Capacity = order.Table.Capacity,
+                    Status = TableStatus.Available,
+                    CurrentOrderId = null,
+                    CurrentBillAmount = 0
+                };
+                await _notifier.BroadcastAsync(HubEvents.TableStatusChanged, tableDto);
+            }
+        }
+        else if (req.Status == OrderStatus.Cancelled && order.Table != null)
+        {
+            var tableDto = new TableDto
+            {
+                Id = order.Table.Id,
+                TableNumber = order.Table.TableNumber,
+                Name = order.Table.Name,
+                Capacity = order.Table.Capacity,
+                Status = TableStatus.Available,
+                CurrentOrderId = null,
+                CurrentBillAmount = 0
+            };
+            await _notifier.BroadcastAsync(HubEvents.TableStatusChanged, tableDto);
+        }
 
         try
         {

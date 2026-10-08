@@ -228,10 +228,18 @@
 
                     <Button x:Name="BtnOpenTableQr" 
                             Content="[ QR โต๊ะ ]" 
-                            Padding="8,3" Margin="0,0,0,0" Height="26"
+                            Padding="8,3" Margin="0,0,6,0" Height="26"
                             Background="#0D47A1" Foreground="White" BorderBrush="#002171"
                             FontWeight="Bold" FontSize="11" Cursor="Hand"
                             Click="BtnOpenTableQr_Click"/>
+
+                    <Button x:Name="BtnExportBackup" 
+                            Content="[ สำรองข้อมูล ]" 
+                            Padding="8,3" Margin="0,0,0,0" Height="26"
+                            Background="#D97706" Foreground="White" BorderBrush="#B45309"
+                            FontWeight="Bold" FontSize="11" Cursor="Hand"
+                            Click="BtnExportBackup_Click"
+                            ToolTip="ส่งออกและสำรองข้อมูลร้านค้าทั้งหมดเป็นไฟล์ JSON"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -380,6 +388,7 @@
                                     <Button x:Name="BtnQuickT7" Content="T7" Width="44" Height="32" Margin="2" Style="{DynamicResource PosTableButtonStyle}" Click="QuickTable_Click" Tag="โต๊ะ 7"/>
                                     <Button x:Name="BtnQuickT8" Content="T8" Width="44" Height="32" Margin="2" Style="{DynamicResource PosTableButtonStyle}" Click="QuickTable_Click" Tag="โต๊ะ 8"/>
                                     <Button x:Name="BtnQuickTakeAway" Content="กลับบ้าน" Height="32" Padding="8,0" Margin="2" Style="{DynamicResource PosTableButtonStyle}" Click="QuickTable_Click" Tag="สั่งกลับบ้าน"/>
+                                    <Button Content="[ ผังโต๊ะ &amp; จัดการจอง ]" Height="32" Padding="8,0" Margin="2" Background="#D97706" Foreground="White" BorderBrush="#B45309" FontWeight="Bold" FontSize="11.5" Click="BtnOpenTableReservation_Click" ToolTip="เปิดผังโต๊ะอาหาร แสดงสถานะสีสด (ว่าง/มีลูกค้า/จองแล้ว) และจัดการการจองโต๊ะ" Cursor="Hand"/>
                                     <Button Content="[ QR โต๊ะ ]" Height="32" Padding="6,0" Margin="2" Background="#0D47A1" Foreground="White" BorderBrush="#002171" FontWeight="Bold" FontSize="11" Click="BtnOpenTableQr_Click" ToolTip="จัดการและพิมพ์ป้าย QR Code ติดโต๊ะอาหาร" Cursor="Hand"/>
                                 </WrapPanel>
 
@@ -1151,8 +1160,12 @@
                                 <StackPanel>
                                     <DockPanel Margin="0,0,0,12">
                                         <TextBlock Text="จัดการข้อมูลโต๊ะอาหาร (Tables Management)" FontWeight="Bold" FontSize="15" Foreground="#1E3A8A" VerticalAlignment="Center"/>
-                                        <Button Content="รีเฟรชข้อมูลโต๊ะ" Height="32" Padding="14,0" Background="#F1F5F9" Foreground="#1E293B" BorderBrush="#CBD5E1" 
-                                                FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Right" Click="BtnRefreshTables_Click" Cursor="Hand"/>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="[ ผังโต๊ะ &amp; จัดการจอง ]" Height="32" Padding="12,0" Background="#D97706" Foreground="White" BorderBrush="#B45309" 
+                                                    FontWeight="Bold" FontSize="12.5" Click="BtnOpenTableReservation_Click" Cursor="Hand" Margin="0,0,6,0"/>
+                                            <Button Content="รีเฟรชข้อมูลโต๊ะ" Height="32" Padding="14,0" Background="#F1F5F9" Foreground="#1E293B" BorderBrush="#CBD5E1" 
+                                                    FontWeight="SemiBold" FontSize="13" Click="BtnRefreshTables_Click" Cursor="Hand"/>
+                                        </StackPanel>
                                     </DockPanel>
 
                                     <!-- Add New Table Box -->
@@ -1262,6 +1275,26 @@
 
                                     <Button Content="บันทึกการตั้งค่าระบบ Sync &amp; Workflow" Width="260" Height="40" Background="#1D4ED8" Foreground="White" 
                                             BorderBrush="#1E40AF" FontWeight="Bold" FontSize="14" HorizontalAlignment="Left" Click="BtnSaveAdvancedSettings_Click" Cursor="Hand"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Section 7: Store Data Backup & Export -->
+                            <Border Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1" Padding="16" Margin="0,0,0,16" CornerRadius="4">
+                                <StackPanel>
+                                    <TextBlock Text="สำรองและส่งออกข้อมูลร้านค้า (Store Data Backup &amp; Export)" FontWeight="Bold" FontSize="15" Foreground="#1E3A8A" Margin="0,0,0,8"/>
+                                    <TextBlock Text="ส่งออกข้อมูลร้านค้าฉบับสมบูรณ์ (หมวดหมู่, เมนูอาหาร, วัตถุดิบ, โต๊ะอาหาร, คำสั่งซื้อ) เป็นไฟล์ JSON บันทึกลงในคอมพิวเตอร์ของคุณ" 
+                                               FontSize="13" Foreground="#475569" Margin="0,0,0,12" TextWrapping="Wrap"/>
+                                    
+                                    <Border Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" Padding="12" CornerRadius="4" Margin="0,0,0,14">
+                                        <TextBlock Text="[ความปลอดภัยและการแยกฐานข้อมูล] ระบบใช้ฐานข้อมูลแยกเฉพาะรายร้าน 100% (1 User = 1 Store = 1 DB) ข้อมูลของคุณจะไม่มีการปะปนกับร้านค้าอื่น" 
+                                                   FontSize="12.5" Foreground="#1D4ED8" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    </Border>
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="[ ส่งออกและสำรองข้อมูล JSON... ]" Width="260" Height="40" Background="#D97706" Foreground="White" 
+                                                BorderBrush="#B45309" FontWeight="Bold" FontSize="14" HorizontalAlignment="Left" Click="BtnExportBackup_Click" Cursor="Hand" Margin="0,0,12,0"/>
+                                        <TextBlock x:Name="TxtBackupStatus" VerticalAlignment="Center" FontSize="13" Foreground="#15803D" FontWeight="SemiBold"/>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

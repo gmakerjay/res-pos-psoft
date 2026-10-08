@@ -230,6 +230,7 @@ public partial class MainWindow : Window
                 }
 
                 _ = RefreshLiveOrdersAsync();
+                _ = RefreshReportsAsync();
             });
         };
 
@@ -238,6 +239,7 @@ public partial class MainWindow : Window
             Dispatcher.Invoke(() =>
             {
                 _ = RefreshLiveOrdersAsync();
+                _ = RefreshReportsAsync();
             });
         };
 
@@ -267,10 +269,11 @@ public partial class MainWindow : Window
 
         _realtime.TableStatusUpdated += table =>
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.Invoke(async () =>
             {
-                _ = RefreshLiveOrdersAsync();
-                _ = LoadTablesSettingsAsync();
+                await RefreshLiveOrdersAsync();
+                await LoadTablesSettingsAsync();
+                UpdateTableButtonsVisuals();
             });
         };
 
@@ -354,6 +357,7 @@ public partial class MainWindow : Window
 
         await LoadCategoriesAndProductsAsync();
         await RefreshLiveOrdersAsync();
+        await LoadTablesSettingsAsync();
         await LoadIngredientsAsync();
         await RefreshReportsAsync();
         await LoadTableOrdersAsync(TxtTableRef.Text.Trim());
@@ -513,6 +517,40 @@ public partial class MainWindow : Window
     {
         if (sender is Button btn && btn.Tag is string tableStr)
         {
+            var matchedTable = _tablesList.FirstOrDefault(t =>
+                string.Equals(t.TableNumber, tableStr, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(t.Name, tableStr, StringComparison.OrdinalIgnoreCase) ||
+                (tableStr != "สั่งกลับบ้าน" && (tableStr.EndsWith(t.TableNumber) || t.TableNumber.EndsWith(tableStr))));
+
+            if (matchedTable != null && matchedTable.Status == TableStatus.Reserved)
+            {
+                var prompt = $"[ โต๊ะ {matchedTable.TableNumber} ] มีการจองไว้โดยคุณ: {matchedTable.ReservationCustomerName ?? "ไม่ระบุชื่อ"}\n" +
+                             $"เบอร์โทร: {matchedTable.ReservationCustomerPhone ?? "-"}\n" +
+                             $"เวลาที่จอง: {matchedTable.ReservationTime?.ToLocalTime():dd/MM/yyyy HH:mm}\n" +
+                             $"จำนวน: {matchedTable.ReservationPartySize ?? matchedTable.Capacity} ท่าน\n" +
+                             (!string.IsNullOrWhiteSpace(matchedTable.ReservationNotes) ? $"หมายเหตุ: {matchedTable.ReservationNotes}\n\n" : "\n") +
+                             "ต้องการ 'เช็คอินเข้าโต๊ะ' (เปลี่ยนสถานะเป็นมีลูกค้าและเริ่มสั่งอาหาร) เลยหรือไม่?";
+
+                var res = MessageBox.Show(prompt, "ข้อมูลการจองโต๊ะ", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                if (res == MessageBoxResult.Cancel)
+                {
+                    return;
+                }
+                if (res == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        await _api.CheckInTableAsync(matchedTable.Id);
+                        await LoadTablesSettingsAsync();
+                        UpdateTableButtonsVisuals();
+                    }
+                    catch (Exception ex)
+                    {
+                        PosLogger.Error("[CheckIn] " + ex.Message, ex);
+                    }
+                }
+            }
+
             TxtTableRef.Text = tableStr;
             if (tableStr.Contains("กลับบ้าน"))
             {
@@ -523,6 +561,21 @@ public partial class MainWindow : Window
                 RbDineIn.IsChecked = true;
             }
             await LoadTableOrdersAsync(tableStr);
+        }
+    }
+
+    private async void BtnOpenTableReservation_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new TableReservationDialog(_api, _realtime, _liveOrders) { Owner = this };
+        var res = dlg.ShowDialog();
+        await LoadTablesSettingsAsync();
+        UpdateTableButtonsVisuals();
+
+        if (res == true && !string.IsNullOrWhiteSpace(dlg.SelectedTableNumberToOrder))
+        {
+            TxtTableRef.Text = dlg.SelectedTableNumberToOrder;
+            RbDineIn.IsChecked = true;
+            await LoadTableOrdersAsync(dlg.SelectedTableNumberToOrder);
         }
     }
 
@@ -606,33 +659,69 @@ public partial class MainWindow : Window
                     (string.Equals(tag, currentRef, StringComparison.OrdinalIgnoreCase) ||
                      (tag == "สั่งกลับบ้าน" && currentRef.Contains("กลับบ้าน")));
 
-                var isOccupied = _liveOrders.Any(o =>
+                var matchedTable = _tablesList.FirstOrDefault(t =>
+                    string.Equals(t.TableNumber, tag, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(t.Name, tag, StringComparison.OrdinalIgnoreCase) ||
+                    (tag != "สั่งกลับบ้าน" && (tag.EndsWith(t.TableNumber) || t.TableNumber.EndsWith(tag) || tag.Contains(t.TableNumber))));
+
+                var hasActiveOrders = _liveOrders.Any(o =>
                     !string.IsNullOrWhiteSpace(o.TableNumber) &&
                     (string.Equals(o.TableNumber, tag, StringComparison.OrdinalIgnoreCase) ||
                      o.TableNumber.Contains(tag) || tag.Contains(o.TableNumber)));
 
+                var isOccupied = hasActiveOrders || (matchedTable != null && matchedTable.Status == TableStatus.Occupied);
+                var isReserved = !isOccupied && matchedTable != null && matchedTable.Status == TableStatus.Reserved;
+
                 if (isSelected)
                 {
-                    btn.Background = new SolidColorBrush(Color.FromRgb(29, 78, 216)); // Deep Blue
-                    btn.Foreground = Brushes.White;
-                    btn.BorderBrush = isOccupied
-                        ? new SolidColorBrush(Color.FromRgb(245, 158, 11)) // Gold/Amber border if occupied
-                        : new SolidColorBrush(Color.FromRgb(30, 64, 175)); // Blue border
+                    if (isOccupied)
+                    {
+                        btn.Background = new SolidColorBrush(Color.FromRgb(220, 38, 38)); // Vivid Red
+                        btn.Foreground = Brushes.White;
+                        btn.BorderBrush = new SolidColorBrush(Color.FromRgb(153, 27, 27));
+                    }
+                    else if (isReserved)
+                    {
+                        btn.Background = new SolidColorBrush(Color.FromRgb(217, 119, 6)); // Warm Amber/Yellow
+                        btn.Foreground = Brushes.White;
+                        btn.BorderBrush = new SolidColorBrush(Color.FromRgb(146, 64, 14));
+                    }
+                    else
+                    {
+                        btn.Background = new SolidColorBrush(Color.FromRgb(29, 78, 216)); // Deep Blue
+                        btn.Foreground = Brushes.White;
+                        btn.BorderBrush = new SolidColorBrush(Color.FromRgb(30, 64, 175)); // Blue border
+                    }
                     btn.FontWeight = FontWeights.Bold;
                 }
                 else if (isOccupied)
                 {
-                    btn.Background = new SolidColorBrush(Color.FromRgb(254, 243, 199)); // Light Amber
-                    btn.Foreground = new SolidColorBrush(Color.FromRgb(146, 64, 14));  // Dark Amber Text
-                    btn.BorderBrush = new SolidColorBrush(Color.FromRgb(217, 119, 6)); // Amber Border
+                    // โต๊ะทำงานอยู่/มีลูกค้า: สีแดง
+                    btn.Background = new SolidColorBrush(Color.FromRgb(254, 226, 226)); // Soft Red (#FEE2E2)
+                    btn.Foreground = new SolidColorBrush(Color.FromRgb(153, 27, 27));  // Dark Red Text (#991B1B)
+                    btn.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 38, 38)); // Red Border (#DC2626)
                     btn.FontWeight = FontWeights.Bold;
+                    btn.ToolTip = $"[ทำงานอยู่/มีลูกค้า] {tag}";
+                }
+                else if (isReserved)
+                {
+                    // โต๊ะจอง: สีเหลือง
+                    btn.Background = new SolidColorBrush(Color.FromRgb(254, 240, 138)); // Soft Yellow (#FEF08A)
+                    btn.Foreground = new SolidColorBrush(Color.FromRgb(133, 77, 14));  // Dark Brown/Amber Text (#854D0E)
+                    btn.BorderBrush = new SolidColorBrush(Color.FromRgb(234, 179, 8)); // Yellow Border (#EAB308)
+                    btn.FontWeight = FontWeights.Bold;
+                    btn.ToolTip = !string.IsNullOrWhiteSpace(matchedTable?.ReservationCustomerName)
+                        ? $"[จองแล้ว: {matchedTable.ReservationCustomerName} โทร {matchedTable.ReservationCustomerPhone}]"
+                        : $"[จองแล้ว] {tag}";
                 }
                 else
                 {
+                    // โต๊ะว่าง: สีปกติ
                     btn.Background = Brushes.White;
                     btn.Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59));
                     btn.BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225));
                     btn.FontWeight = FontWeights.SemiBold;
+                    btn.ToolTip = $"[ว่าง] {tag}";
                 }
             }
         }
@@ -687,6 +776,54 @@ public partial class MainWindow : Window
         {
             PosLogger.Error("[MainWindow] Failed to open TableQrDialog: " + ex.Message, ex);
             MessageBox.Show("ไม่สามารถเปิดหน้าต่างจัดการ QR Code โต๊ะได้: " + ex.Message, "ข้อผิดพลาด", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void BtnExportBackup_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentUser == null && string.IsNullOrEmpty(_api.AuthToken))
+        {
+            MessageBox.Show("กรุณาเข้าสู่ระบบก่อนทำการสำรองข้อมูลร้านค้า", "แจ้งเตือน", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var storeCode = string.IsNullOrWhiteSpace(_config.StoreCode) ? "DEFAULT" : _config.StoreCode.Trim().ToUpperInvariant();
+        var sfd = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "บันทึกไฟล์สำรองข้อมูลร้านค้า (JSON)",
+            FileName = $"Backup_{storeCode}_{DateTime.Now:yyyyMMdd_HHmmss}.json",
+            Filter = "JSON Files (*.json)|*.json|All Files (*.*)|*.*",
+            DefaultExt = ".json"
+        };
+
+        if (sfd.ShowDialog() == true)
+        {
+            try
+            {
+                Mouse.OverrideCursor = Cursors.Wait;
+                TxtStatusBar.Text = "กำลังดาวน์โหลดไฟล์สำรองข้อมูลร้านค้าจากเซิร์ฟเวอร์...";
+                var json = await _api.ExportStoreBackupRawJsonAsync();
+                await System.IO.File.WriteAllTextAsync(sfd.FileName, json);
+
+                TxtStatusBar.Text = $"สำรองข้อมูลสำเร็จ: {System.IO.Path.GetFileName(sfd.FileName)}";
+                if (TxtBackupStatus != null)
+                {
+                    TxtBackupStatus.Text = $"สำรองข้อมูลสำเร็จ ({DateTime.Now:HH:mm:ss})";
+                }
+
+                MessageBox.Show($"ส่งออกและสำรองข้อมูลร้านค้าเรียบร้อยแล้ว\n\nไฟล์บันทึกที่: {sfd.FileName}\n\n[ข้อมูลถูกแยกฐานข้อมูลเฉพาะร้านค้า 100% ไม่ปะปนกับร้านค้าอื่น]", 
+                    "สำรองข้อมูลสำเร็จ", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                PosLogger.Error("[Backup] Export failed: " + ex.Message, ex);
+                MessageBox.Show("ไม่สามารถส่งออกข้อมูลสำรองได้: " + ex.Message, "ข้อผิดพลาด", MessageBoxButton.OK, MessageBoxImage.Error);
+                TxtStatusBar.Text = "สำรองข้อมูลล้มเหลว: " + ex.Message;
+            }
+            finally
+            {
+                Mouse.OverrideCursor = null;
+            }
         }
     }
 

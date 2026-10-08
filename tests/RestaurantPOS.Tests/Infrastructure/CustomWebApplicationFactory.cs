@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 
+[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
+
 namespace RestaurantPOS.Tests.Infrastructure;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>

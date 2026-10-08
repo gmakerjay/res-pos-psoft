@@ -49,6 +49,7 @@ public class TablesController : ControllerBase
             var currentOrder = matches.OrderByDescending(m => m.CreatedAt).FirstOrDefault();
             var totalBill = matches.Sum(m => m.TotalAmount);
             var isOccupied = matches.Any() || t.Status == TableStatus.Occupied;
+            var effectiveStatus = isOccupied ? TableStatus.Occupied : (t.Status == TableStatus.Reserved ? TableStatus.Reserved : TableStatus.Available);
 
             return new TableDto
             {
@@ -56,10 +57,15 @@ public class TablesController : ControllerBase
                 TableNumber = t.TableNumber,
                 Name = t.Name,
                 Capacity = t.Capacity,
-                Status = isOccupied ? TableStatus.Occupied : TableStatus.Available,
+                Status = effectiveStatus,
                 CurrentOrderId = currentOrder?.Id,
                 CurrentBillAmount = totalBill,
-                SeatedAt = t.SeatedAt ?? currentOrder?.CreatedAt
+                SeatedAt = t.SeatedAt ?? currentOrder?.CreatedAt,
+                ReservationCustomerName = t.ReservationCustomerName,
+                ReservationCustomerPhone = t.ReservationCustomerPhone,
+                ReservationTime = t.ReservationTime,
+                ReservationPartySize = t.ReservationPartySize,
+                ReservationNotes = t.ReservationNotes
             };
         }).ToList();
 
@@ -85,7 +91,12 @@ public class TablesController : ControllerBase
             Status = t.Status,
             CurrentOrderId = currentOrder?.Id,
             CurrentBillAmount = currentOrder?.TotalAmount ?? 0,
-            SeatedAt = t.SeatedAt
+            SeatedAt = t.SeatedAt,
+            ReservationCustomerName = t.ReservationCustomerName,
+            ReservationCustomerPhone = t.ReservationCustomerPhone,
+            ReservationTime = t.ReservationTime,
+            ReservationPartySize = t.ReservationPartySize,
+            ReservationNotes = t.ReservationNotes
         };
 
         return Ok(ApiResponse<TableDto>.Ok(dto));
@@ -103,6 +114,11 @@ public class TablesController : ControllerBase
         {
             table.SeatedAt = null;
             table.CurrentOrderId = null;
+            table.ReservationCustomerName = null;
+            table.ReservationCustomerPhone = null;
+            table.ReservationTime = null;
+            table.ReservationPartySize = null;
+            table.ReservationNotes = null;
         }
         else if (status == TableStatus.Occupied && table.SeatedAt == null)
         {
@@ -118,12 +134,118 @@ public class TablesController : ControllerBase
             Name = table.Name,
             Capacity = table.Capacity,
             Status = table.Status,
-            SeatedAt = table.SeatedAt
+            SeatedAt = table.SeatedAt,
+            ReservationCustomerName = table.ReservationCustomerName,
+            ReservationCustomerPhone = table.ReservationCustomerPhone,
+            ReservationTime = table.ReservationTime,
+            ReservationPartySize = table.ReservationPartySize,
+            ReservationNotes = table.ReservationNotes
         };
 
         // Broadcast real-time table status update (tenant-scoped)
         await _notifier.BroadcastAsync(HubEvents.TableStatusChanged, dto);
         _logger.LogInformation("[Table] Table {TableNumber} status changed to {Status}", table.TableNumber, status);
+
+        return Ok(ApiResponse<TableDto>.Ok(dto));
+    }
+
+    [HttpPost("{id}/reserve")]
+    public async Task<ActionResult<ApiResponse<TableDto>>> ReserveTable(int id, [FromBody] ReserveTableRequest req)
+    {
+        var table = await _db.Tables.FindAsync(id);
+        if (table == null)
+            return NotFound(ApiResponse<TableDto>.Fail("Table not found", ErrorCodes.TableNotFound));
+
+        table.Status = TableStatus.Reserved;
+        table.ReservationCustomerName = req.CustomerName?.Trim();
+        table.ReservationCustomerPhone = req.CustomerPhone?.Trim();
+        table.ReservationTime = req.ReservationTime != default ? req.ReservationTime : DateTime.UtcNow;
+        table.ReservationPartySize = req.PartySize > 0 ? req.PartySize : table.Capacity;
+        table.ReservationNotes = req.Notes?.Trim();
+
+        await _db.SaveChangesAsync();
+
+        var dto = new TableDto
+        {
+            Id = table.Id,
+            TableNumber = table.TableNumber,
+            Name = table.Name,
+            Capacity = table.Capacity,
+            Status = table.Status,
+            ReservationCustomerName = table.ReservationCustomerName,
+            ReservationCustomerPhone = table.ReservationCustomerPhone,
+            ReservationTime = table.ReservationTime,
+            ReservationPartySize = table.ReservationPartySize,
+            ReservationNotes = table.ReservationNotes
+        };
+
+        await _notifier.BroadcastAsync(HubEvents.TableStatusChanged, dto);
+        _logger.LogInformation("[Table] Table {TableNumber} reserved for {CustomerName}", table.TableNumber, req.CustomerName);
+
+        return Ok(ApiResponse<TableDto>.Ok(dto));
+    }
+
+    [HttpPost("{id}/check-in")]
+    public async Task<ActionResult<ApiResponse<TableDto>>> CheckInTable(int id)
+    {
+        var table = await _db.Tables.FindAsync(id);
+        if (table == null)
+            return NotFound(ApiResponse<TableDto>.Fail("Table not found", ErrorCodes.TableNotFound));
+
+        table.Status = TableStatus.Occupied;
+        table.SeatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+
+        var dto = new TableDto
+        {
+            Id = table.Id,
+            TableNumber = table.TableNumber,
+            Name = table.Name,
+            Capacity = table.Capacity,
+            Status = table.Status,
+            SeatedAt = table.SeatedAt,
+            ReservationCustomerName = table.ReservationCustomerName,
+            ReservationCustomerPhone = table.ReservationCustomerPhone,
+            ReservationTime = table.ReservationTime,
+            ReservationPartySize = table.ReservationPartySize,
+            ReservationNotes = table.ReservationNotes
+        };
+
+        await _notifier.BroadcastAsync(HubEvents.TableStatusChanged, dto);
+        _logger.LogInformation("[Table] Table {TableNumber} checked in (Occupied)", table.TableNumber);
+
+        return Ok(ApiResponse<TableDto>.Ok(dto));
+    }
+
+    [HttpPost("{id}/cancel-reservation")]
+    public async Task<ActionResult<ApiResponse<TableDto>>> CancelReservation(int id)
+    {
+        var table = await _db.Tables.FindAsync(id);
+        if (table == null)
+            return NotFound(ApiResponse<TableDto>.Fail("Table not found", ErrorCodes.TableNotFound));
+
+        table.Status = TableStatus.Available;
+        table.ReservationCustomerName = null;
+        table.ReservationCustomerPhone = null;
+        table.ReservationTime = null;
+        table.ReservationPartySize = null;
+        table.ReservationNotes = null;
+        table.SeatedAt = null;
+
+        await _db.SaveChangesAsync();
+
+        var dto = new TableDto
+        {
+            Id = table.Id,
+            TableNumber = table.TableNumber,
+            Name = table.Name,
+            Capacity = table.Capacity,
+            Status = table.Status
+        };
+
+        await _notifier.BroadcastAsync(HubEvents.TableStatusChanged, dto);
+        _logger.LogInformation("[Table] Reservation cancelled for Table {TableNumber}", table.TableNumber);
 
         return Ok(ApiResponse<TableDto>.Ok(dto));
     }

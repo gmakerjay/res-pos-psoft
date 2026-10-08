@@ -18,6 +18,15 @@ public class TableEntity
     public int? CurrentOrderId { get; set; }
     public DateTime? SeatedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [MaxLength(100)]
+    public string? ReservationCustomerName { get; set; }
+    [MaxLength(50)]
+    public string? ReservationCustomerPhone { get; set; }
+    public DateTime? ReservationTime { get; set; }
+    public int? ReservationPartySize { get; set; }
+    [MaxLength(255)]
+    public string? ReservationNotes { get; set; }
 }
 
 [Table("Categories")]

@@ -7,7 +7,8 @@ import {
   getStoredUser, uploadProductImage, getIngredients, createIngredient,
   updateIngredient, deleteIngredient, adjustIngredientStock, getAuditLogs,
   getStoredTenantCode, setStoredTenantCode, getStoreInfo, registerStore, checkStore,
-  simulateStoreStatus, isDevUnlocked, unlockDevMode, lockDevMode
+  simulateStoreStatus, isDevUnlocked, unlockDevMode, lockDevMode,
+  exportStoreBackup, downloadStoreBackup
 } from './services/api';
 import type { 
   CategoryItem, ProductItem, IngredientItem, Order, CreateOrderPayload, 
@@ -22,20 +23,30 @@ import {
 } from './services/sound';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SoftwareLandingView } from './components/SoftwareLandingView';
+import { RegisterStorePage } from './components/RegisterStorePage';
 import { TableQrManagerModal } from './components/TableQrManagerModal';
 import { ActivateLicenseModal } from './components/ActivateLicenseModal';
+import { TableReservationModal } from './components/TableReservationModal';
+import { TableManagerView } from './components/TableManagerView';
 
 // Initialize global logger error handlers
 initGlobalErrorHandlers();
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'customer' | 'kitchen' | 'manage'>('customer');
+  const [activeTab, setActiveTab] = useState<'customer' | 'kitchen' | 'manage' | 'tables'>('customer');
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [showServerModal, setShowServerModal] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(getStoredUser());
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [loginModalStoreCode, setLoginModalStoreCode] = useState<string>('');
-  const [pendingTab, setPendingTab] = useState<'kitchen' | 'manage' | null>(null);
+  const [pendingTab, setPendingTab] = useState<'kitchen' | 'manage' | 'tables' | null>(null);
+
+  // Dedicated Register Page State
+  const [isRegisterPageActive, setIsRegisterPageActive] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const p = new URLSearchParams(window.location.search);
+    return p.get('page') === 'register' || p.get('view') === 'register' || p.get('register') === '1';
+  });
 
   // Multi-Tenant Store States
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
@@ -179,8 +190,8 @@ export function App() {
     }
   };
 
-  const handleTabChange = (tab: 'customer' | 'kitchen' | 'manage') => {
-    if (tab === 'kitchen' || tab === 'manage') {
+  const handleTabChange = (tab: 'customer' | 'kitchen' | 'manage' | 'tables') => {
+    if (tab === 'kitchen' || tab === 'manage' || tab === 'tables') {
       if (!currentUser) {
         setPendingTab(tab);
         setShowLoginModal(true);
@@ -209,6 +220,42 @@ export function App() {
       setActiveTab('customer');
     }
   };
+
+  // If visiting or switching to dedicated Register Store Page
+  if (isRegisterPageActive) {
+    return (
+      <ErrorBoundary>
+        <RegisterStorePage
+          onBackToHome={() => {
+            window.history.pushState({}, '', '/');
+            setIsRegisterPageActive(false);
+          }}
+          onOpenLogin={(code) => {
+            if (code) setLoginModalStoreCode(code);
+            setShowLoginModal(true);
+          }}
+          onStoreCreated={(st) => {
+            setStoreInfo(st);
+            setStoredTenantCode(st.storeCode);
+          }}
+        />
+        {showLoginModal && (
+          <LoginModal 
+            initialStoreCode={loginModalStoreCode}
+            onSuccess={handleLoginSuccess} 
+            onClose={() => {
+              setShowLoginModal(false);
+              setPendingTab(null);
+            }} 
+            onOpenActivateLicense={() => {
+              setShowLoginModal(false);
+              setShowActivateLicenseModal(true);
+            }}
+          />
+        )}
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>
@@ -275,6 +322,27 @@ export function App() {
 
               <button
                 onClick={() => {
+                  window.open('/?page=register', '_blank');
+                }}
+                style={{
+                  backgroundColor: '#00E676',
+                  color: '#004D40',
+                  border: 'none',
+                  padding: '6px 13px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  whiteSpace: 'nowrap'
+                }}
+                title="เปิดหน้าลงทะเบียนร้านค้าใหม่ในหน้าต่างใหม่"
+              >
+                [ + ลงทะเบียนร้านค้า ]
+              </button>
+
+              <button
+                onClick={() => {
                   setLoginModalStoreCode('');
                   setShowLoginModal(true);
                 }}
@@ -308,10 +376,10 @@ export function App() {
                     color: '#FFF',
                     textDecoration: 'none',
                     fontWeight: 'bold',
-                    fontSize: '13.5px',
+                    fontSize: '13px',
                     whiteSpace: 'nowrap',
-                    padding: '2px 6px',
-                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    padding: '2px 7px',
+                    backgroundColor: 'rgba(255,255,255,0.18)',
                     borderRadius: '4px'
                   }}
                   title="กลับหน้าหลักซอฟต์แวร์"
@@ -320,23 +388,23 @@ export function App() {
                 </a>
                 <span style={{
                   backgroundColor: '#1565C0',
-                  padding: '3px 8px',
+                  padding: '2px 7px',
                   borderRadius: '4px',
-                  fontSize: '11.5px',
+                  fontSize: '11px',
                   fontWeight: 'bold',
                   color: '#FFEB3B',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  maxWidth: '180px'
+                  maxWidth: '140px'
                 }}>
-                  [ร้าน: {storeInfo ? storeInfo.storeName : (getStoredTenantCode() === 'DEFAULT' ? 'ร้านอาหารตัวอย่าง (สาขาหลัก)' : getStoredTenantCode())}]
+                  {storeInfo ? storeInfo.storeName : (getStoredTenantCode() === 'DEFAULT' ? 'ร้านอาหารตัวอย่าง' : getStoredTenantCode())}
                 </span>
                 <span style={{
                   backgroundColor: '#2E7D32',
-                  padding: '3px 8px',
+                  padding: '2px 7px',
                   borderRadius: '4px',
-                  fontSize: '11.5px',
+                  fontSize: '11px',
                   fontWeight: 'bold',
                   whiteSpace: 'nowrap'
                 }}>
@@ -349,12 +417,12 @@ export function App() {
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px',
+                  gap: '4px',
                   backgroundColor: isStorePosOnline ? '#2E7D32' : '#C62828',
                   color: '#FFF',
-                  padding: '3px 8px',
+                  padding: '2px 7px',
                   borderRadius: '4px',
-                  fontSize: '11px',
+                  fontSize: '10.5px',
                   fontWeight: 'bold',
                   whiteSpace: 'nowrap'
                 }}>
@@ -364,114 +432,98 @@ export function App() {
                     borderRadius: '50%',
                     backgroundColor: '#FFF'
                   }} />
-                  <span>{isStorePosOnline ? '[หน้าร้าน: เปิดรับออเดอร์]' : '[หน้าร้าน: ยังไม่เปิดรับออเดอร์]'}</span>
+                  <span>{isStorePosOnline ? '[หน้าร้านเปิด]' : '[หน้าร้านปิด]'}</span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', whiteSpace: 'nowrap' }}>
-                  <span style={{
-                    width: '7px',
-                    height: '7px',
-                    borderRadius: '50%',
-                    backgroundColor: connectionState === 'connected' ? '#00E676' : '#FF5252'
-                  }} />
-                  <span style={{ opacity: 0.85 }}>{connectionState === 'connected' ? '[Server: Online]' : '[Server: Offline]'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Row 2: Live Demo Switcher & Navigation Actions (Cleanly separated on mobile, aligned on desktop) */}
-            <div className="pos-header-customer-row2">
-              {/* Demo Mode Toggle Button (Only visible in DEV Mode) */}
-              {isDevMode && (
                 <button
                   type="button"
-                  onClick={handleToggleDemoOnline}
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('toggle-order-tracking'));
+                  }}
                   style={{
-                    backgroundColor: isStorePosOnline ? '#E65100' : '#2E7D32',
+                    backgroundColor: 'rgba(255,255,255,0.22)',
                     color: '#FFF',
-                    border: '1px solid rgba(255,255,255,0.4)',
-                    padding: '4px 8px',
+                    border: '1px solid rgba(255,255,255,0.45)',
+                    padding: '3px 8px',
                     borderRadius: '4px',
                     fontSize: '11px',
                     fontWeight: 'bold',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap'
                   }}
-                  title="คลิกเพื่อจำลองสลับสถานะร้านเปิด / ร้านปิด แบบ Real-Time สำหรับการนำเสนองานขาย"
+                  title="ติดตามสถานะออเดอร์ด้วยเบอร์โทรศัพท์"
                 >
-                  [ จำลอง: {isStorePosOnline ? 'สลับเป็นร้านปิด' : 'สลับเป็นร้านเปิด'} ]
+                  [ ติดตามออเดอร์ ]
                 </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginModalStoreCode(getStoredTenantCode() || 'DEFAULT');
-                  setShowLoginModal(true);
-                }}
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.18)',
-                  color: '#FFF',
-                  border: '1px solid rgba(255,255,255,0.4)',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-                title="ทดลองเข้าสู่ระบบจัดการและจอครัว KDS (admin / psoft123)"
-              >
-                [ ลองเข้าจอครัว &amp; จัดการร้าน ]
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const trackEl = document.getElementById('order-tracking-section');
-                  if (trackEl) {
-                    trackEl.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }}
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.25)',
-                  color: '#FFF',
-                  border: '1px solid rgba(255,255,255,0.5)',
-                  padding: '4px 10px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-                title="ติดตามสถานะออเดอร์ด้วยเบอร์โทรศัพท์"
-              >
-                [ ติดตามออเดอร์ ]
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsDemoViewActive(false);
-                  window.history.pushState({}, '', '/');
-                }}
-                style={{
-                  backgroundColor: '#FFEB3B',
-                  color: '#0D47A1',
-                  border: 'none',
-                  padding: '4px 10px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                  whiteSpace: 'nowrap'
-                }}
-                title="กลับสู่หน้าหลักแนะนำซอฟต์แวร์และลงทะเบียนร้านค้า"
-              >
-                [ กลับหน้าหลักซอฟต์แวร์ ]
-              </button>
+              </div>
             </div>
+
+            {/* Row 2: Live Demo Switcher & Navigation Actions (Visible only in Dev Mode or Demo View) */}
+            {(isDevMode || isDemoViewActive) && (
+              <div className="pos-header-customer-row2">
+                {isDevMode && (
+                  <button
+                    type="button"
+                    onClick={handleToggleDemoOnline}
+                    style={{
+                      backgroundColor: isStorePosOnline ? '#E65100' : '#2E7D32',
+                      color: '#FFF',
+                      border: '1px solid rgba(255,255,255,0.4)',
+                      padding: '3px 7px',
+                      borderRadius: '4px',
+                      fontSize: '10.5px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    [ จำลอง: {isStorePosOnline ? 'ร้านปิด' : 'ร้านเปิด'} ]
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginModalStoreCode(getStoredTenantCode() || 'DEFAULT');
+                    setShowLoginModal(true);
+                  }}
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.18)',
+                    color: '#FFF',
+                    border: '1px solid rgba(255,255,255,0.4)',
+                    padding: '3px 7px',
+                    borderRadius: '4px',
+                    fontSize: '10.5px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  [ เข้าจอครัว &amp; จัดการ ]
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDemoViewActive(false);
+                    window.history.pushState({}, '', '/');
+                  }}
+                  style={{
+                    backgroundColor: '#FFEB3B',
+                    color: '#0D47A1',
+                    border: 'none',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    fontSize: '10.5px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  [ หน้าหลัก ]
+                </button>
+              </div>
+            )}
           </header>
         )}
 
@@ -624,6 +676,22 @@ export function App() {
               [ สำหรับผู้จัดการ ] สรุปรายงาน &amp; จัดการระบบ
             </button>
             <button
+              onClick={() => handleTabChange('tables')}
+              style={{
+                padding: '10px 14px',
+                border: 'none',
+                background: 'none',
+                borderBottom: activeTab === 'tables' ? '3px solid #1976D2' : '3px solid transparent',
+                color: activeTab === 'tables' ? '#1976D2' : '#6C757D',
+                fontWeight: activeTab === 'tables' ? 'bold' : 'normal',
+                fontSize: '13px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              [ สำหรับหน้าร้าน ] ผังโต๊ะ &amp; จัดการจอง
+            </button>
+            <button
               onClick={() => handleTabChange('customer')}
               style={{
                 padding: '10px 14px',
@@ -676,6 +744,9 @@ export function App() {
                 if (code) setLoginModalStoreCode(code);
                 setShowLoginModal(true);
               }}
+              onOpenRegister={() => {
+                window.open('/?page=register', '_blank');
+              }}
               onStoreCreated={(st) => {
                 setStoreInfo(st);
                 setStoredTenantCode(st.storeCode);
@@ -720,6 +791,7 @@ export function App() {
           )}
           {currentUser && activeTab === 'kitchen' && <KitchenView />}
           {currentUser && activeTab === 'manage' && <ManagementView />}
+          {currentUser && activeTab === 'tables' && <TableManagerView storeInfo={storeInfo} />}
         </main>
 
         {/* Login Modal */}
@@ -769,7 +841,7 @@ export function App() {
             }}
             onOpenRegister={() => {
               setShowSwitchStoreModal(false);
-              setShowRegisterStoreModal(true);
+              window.open('/?page=register', '_blank');
             }}
           />
         )}
@@ -1070,8 +1142,7 @@ function CustomerView({
     return () => unsub();
   }, []);
 
-  const [isReservation, setIsReservation] = useState<boolean>(false);
-  const [reservationInfo, setReservationInfo] = useState<string>('');
+  const [showReservationModal, setShowReservationModal] = useState<boolean>(false);
 
   const [selectedTable, setSelectedTable] = useState<string>(() => {
     if (typeof window === 'undefined') return 'ออนไลน์';
@@ -1139,6 +1210,24 @@ function CustomerView({
   const [isTrackingCardExpanded, setIsTrackingCardExpanded] = useState<boolean>(true);
   const [showPhoneSearchBox, setShowPhoneSearchBox] = useState<boolean>(false);
 
+  const [showStoreDetails, setShowStoreDetails] = useState<boolean>(false);
+  const [showCustomerPreInfo, setShowCustomerPreInfo] = useState<boolean>(false);
+  const [isTrackingSectionOpen, setIsTrackingSectionOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handler = () => {
+      setIsTrackingSectionOpen(prev => !prev);
+      setTimeout(() => {
+        const trackEl = document.getElementById('order-tracking-section');
+        if (trackEl) {
+          trackEl.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 50);
+    };
+    window.addEventListener('toggle-order-tracking', handler);
+    return () => window.removeEventListener('toggle-order-tracking', handler);
+  }, []);
+
   const fetchTrackedOrders = async (phone: string, showEmptyAlert = true) => {
     const clean = phone.replace(/\D/g, '');
     if (!clean || clean.length < 9) {
@@ -1152,6 +1241,9 @@ function CustomerView({
       setTrackedOrders(orders);
       setTrackedPhone(clean);
       setShowPhoneSearchBox(false);
+      if (orders.length > 0) {
+        setIsTrackingSectionOpen(true);
+      }
       const code = getStoredTenantCode() || 'DEFAULT';
       localStorage.setItem(`rpos_tracked_phone_${code}`, clean);
       if (orders.length === 0 && showEmptyAlert) {
@@ -1344,15 +1436,12 @@ function CustomerView({
     }
     setIsSubmitting(true);
     try {
-      const isTakeaway = !sessionParams.table && !isReservation;
+      const isTakeaway = !sessionParams.table;
       const finalTableNumber = sessionParams.table 
         ? sessionParams.table 
-        : (isReservation ? 'จองโต๊ะ' : 'ออนไลน์');
+        : 'ออนไลน์';
 
-      let combinedNotes = notes ? notes.trim() : '';
-      if (isReservation && reservationInfo.trim()) {
-        combinedNotes = `[จองโต๊ะ: ${reservationInfo.trim()}] ${combinedNotes}`.trim();
-      }
+      const combinedNotes = notes ? notes.trim() : '';
 
       const payload: CreateOrderPayload = {
         type: isTakeaway ? 2 : 1, // 1=DineIn, 2=TakeAway
@@ -1418,287 +1507,259 @@ function CustomerView({
 
   return (
     <div>
-      {/* Store Information, Contact Card & Real-Time POS Status */}
+      {/* Compact Quick Bar: Store, Table & Quick Actions */}
       <div style={{
         backgroundColor: '#FFF',
         border: isStorePosOnline ? '1px solid #C8E6C9' : '1px solid #FFCDD2',
-        borderLeft: isStorePosOnline ? '6px solid #2E7D32' : '6px solid #C62828',
+        borderLeft: isStorePosOnline ? '5px solid #2E7D32' : '5px solid #C62828',
         borderRadius: '8px',
-        padding: '16px',
-        marginBottom: '16px',
+        padding: '10px 14px',
+        marginBottom: '10px',
         boxShadow: 'var(--shadow)'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1E293B', margin: 0 }}>
-                {storeInfo?.storeName || (getStoredTenantCode() === 'DEFAULT' ? 'ร้านอาหารตัวอย่าง (สาขาหลัก)' : getStoredTenantCode())}
-              </h2>
-              <span style={{
-                backgroundColor: isStorePosOnline ? '#2E7D32' : '#C62828',
-                color: '#FFF',
-                padding: '3px 10px',
-                borderRadius: '20px',
-                fontSize: '11.5px',
-                fontWeight: 'bold'
-              }}>
-                {isStorePosOnline ? '[ เปิดให้บริการ - พร้อมรับออเดอร์ ]' : '[ ขณะนี้ร้านยังไม่เปิดรับออเดอร์ ]'}
-              </span>
-            </div>
-
-            {/* Store Contacts: Phone, Address, Operating Hours */}
-            <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '13px', color: '#475569' }}>
-              {storeInfo?.ownerPhone && (
-                <div>
-                  <span style={{ fontWeight: 'bold', color: '#1E293B' }}>เบอร์โทรติดต่อร้าน: </span>
-                  <a
-                    href={`tel:${storeInfo.ownerPhone}`}
-                    style={{ color: '#0D47A1', fontWeight: 'bold', textDecoration: 'none' }}
-                    title="กดเพื่อโทรออก"
-                  >
-                    [ โทร: {storeInfo.ownerPhone} ]
-                  </a>
-                </div>
-              )}
-              {storeInfo?.address && (
-                <div>
-                  <span style={{ fontWeight: 'bold', color: '#1E293B' }}>ที่อยู่ร้าน: </span>
-                  <span>{storeInfo.address}</span>
-                </div>
-              )}
-              <div>
-                <span style={{ fontWeight: 'bold', color: '#1E293B' }}>เวลาทำการ: </span>
-                <span>{storeInfo?.openingHours || '10:00 - 22:00 น.'}</span>
-              </div>
-            </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#1E293B' }}>
+              {storeInfo?.storeName || (getStoredTenantCode() === 'DEFAULT' ? 'ร้านอาหารตัวอย่าง' : getStoredTenantCode())}
+            </span>
+            <span style={{
+              backgroundColor: isStorePosOnline ? '#2E7D32' : '#C62828',
+              color: '#FFF',
+              padding: '2px 8px',
+              borderRadius: '12px',
+              fontSize: '11px',
+              fontWeight: 'bold'
+            }}>
+              {isStorePosOnline ? '[ พร้อมรับออเดอร์ ]' : '[ หน้าร้านยังไม่เปิด ]'}
+            </span>
+            <span style={{
+              backgroundColor: '#F1F5F9',
+              color: '#334155',
+              border: '1px solid #CBD5E1',
+              padding: '2px 8px',
+              borderRadius: '12px',
+              fontSize: '11px',
+              fontWeight: 'bold'
+            }}>
+              {sessionParams.table ? `[ โต๊ะ: ${sessionParams.table} ]` : (sessionParams.type === 'takeaway' ? '[ สั่งกลับบ้าน ]' : '[ สั่งออนไลน์ ]')}
+            </span>
           </div>
 
-          {/* Interactive Demo Pitching Toggle (Visible only in DEV Mode) */}
-          {isDevMode && onToggleDemoOnline && (
-            <div style={{
-              backgroundColor: '#F8FAFC',
-              border: '1px dashed #94A3B8',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              alignItems: 'flex-end'
-            }}>
-              <span style={{ fontSize: '10.5px', color: '#64748B', fontWeight: 'bold' }}>
-                [ จำลองสถานะสำหรับนำเสนอขาย (Live Pitch) ]
-              </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setShowReservationModal(true)}
+              style={{
+                backgroundColor: '#FEF08A',
+                border: '1.5px solid #EAB308',
+                color: '#854D0E',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '11.5px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
+              }}
+              title="เปิดผังโต๊ะอาหารเพื่อเลือกจองโต๊ะล่วงหน้า"
+            >
+              [ จองโต๊ะล่วงหน้า ]
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowStoreDetails(!showStoreDetails)}
+              style={{
+                backgroundColor: showStoreDetails ? '#E2E8F0' : '#F8FAFC',
+                border: '1px solid #CBD5E1',
+                color: '#475569',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '11.5px',
+                cursor: 'pointer'
+              }}
+            >
+              {showStoreDetails ? '[ ซ่อนข้อมูลร้าน ]' : '[ ข้อมูลร้าน ]'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowCustomerPreInfo(!showCustomerPreInfo)}
+              style={{
+                backgroundColor: showCustomerPreInfo ? '#E0F2FE' : '#F8FAFC',
+                border: showCustomerPreInfo ? '1px solid #7DD3FC' : '1px solid #CBD5E1',
+                color: showCustomerPreInfo ? '#0284C7' : '#475569',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '11.5px',
+                cursor: 'pointer'
+              }}
+            >
+              {showCustomerPreInfo ? '[ ซ่อนข้อมูลผู้สั่ง ]' : (customerName || customerPhone ? `[ ผู้สั่ง: ${customerName || customerPhone} ]` : '[ + ระบุชื่อ/โน้ต ]')}
+            </button>
+
+            {isDevMode && onToggleDemoOnline && (
               <button
                 type="button"
                 onClick={onToggleDemoOnline}
                 style={{
-                  backgroundColor: isStorePosOnline ? '#E65100' : '#2E7D32',
-                  color: '#FFF',
-                  border: 'none',
-                  padding: '5px 12px',
-                  borderRadius: '4px',
-                  fontSize: '11.5px',
+                  backgroundColor: isStorePosOnline ? '#FFF3E0' : '#E8F5E9',
+                  border: isStorePosOnline ? '1px solid #FFB74D' : '1px solid #81C784',
+                  color: isStorePosOnline ? '#E65100' : '#2E7D32',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
                   fontWeight: 'bold',
                   cursor: 'pointer'
                 }}
               >
-                [ คลิกสลับ: {isStorePosOnline ? 'จำลองร้านปิด (ดูเมนูได้อย่างเดียว)' : 'จำลองร้านเปิด (สั่งอาหารได้)'} ]
+                [ สลับร้าน {isStorePosOnline ? 'ปิด' : 'เปิด'} ]
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Offline Notice Banner when POS is not active */}
+        {/* Store Details Dropdown */}
+        {showStoreDetails && (
+          <div style={{
+            marginTop: '10px',
+            paddingTop: '10px',
+            borderTop: '1px dashed #E2E8F0',
+            fontSize: '12.5px',
+            color: '#475569',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            {storeInfo?.ownerPhone && (
+              <div>
+                <span style={{ fontWeight: 'bold', color: '#1E293B' }}>เบอร์โทร: </span>
+                <a href={`tel:${storeInfo.ownerPhone}`} style={{ color: '#0D47A1', fontWeight: 'bold' }}>
+                  {storeInfo.ownerPhone}
+                </a>
+              </div>
+            )}
+            {storeInfo?.address && (
+              <div>
+                <span style={{ fontWeight: 'bold', color: '#1E293B' }}>ที่อยู่: </span>
+                <span>{storeInfo.address}</span>
+              </div>
+            )}
+            <div>
+              <span style={{ fontWeight: 'bold', color: '#1E293B' }}>เวลาทำการ: </span>
+              <span>{storeInfo?.openingHours || '10:00 - 22:00 น.'}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Offline Warning Notice */}
         {!isStorePosOnline && (
           <div style={{
-            marginTop: '12px',
+            marginTop: '10px',
             backgroundColor: '#FFF8E1',
             border: '1px solid #FFE082',
             borderRadius: '6px',
-            padding: '10px 14px',
-            fontSize: '12.5px',
+            padding: '8px 12px',
+            fontSize: '12px',
             color: '#B78103'
           }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-              [ ประกาศ: ขณะนี้ร้านยังไม่เปิดให้บริการ หรือระบบเครื่องแคชเชียร์หน้าร้านปิดอยู่ ]
+            <strong>[ ประกาศ ]</strong> ขณะนี้เครื่องแคชเชียร์หน้าร้านยังไม่เปิดออนไลน์ ท่านสามารถเลือกชมเมนูและราคาได้ล่วงหน้า เมื่อร้านเปิดระบบจะสั่งได้ทันที
+          </div>
+        )}
+
+        {/* Customer Pre-Info Drawer/Dropdown */}
+        {showCustomerPreInfo && (
+          <div style={{
+            marginTop: '10px',
+            paddingTop: '10px',
+            borderTop: '1px dashed #BAE6FD',
+            backgroundColor: '#F0F9FF',
+            borderRadius: '6px',
+            padding: '10px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '10px'
+          }}>
+            {!sessionParams.table && (
+              <div style={{ width: '100%', marginBottom: '4px', fontSize: '12px', color: '#64748B' }}>
+                ต้องการจองโต๊ะล่วงหน้าหรือไม่?{' '}
+                <button
+                  type="button"
+                  onClick={() => setShowReservationModal(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#B45309',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    padding: 0,
+                    fontSize: '12px'
+                  }}
+                >
+                  [ คลิกเพื่อเปิดผังจองโต๊ะ ]
+                </button>
+              </div>
+            )}
+            <div style={{ flex: '1 1 120px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '2px' }}>
+                ชื่อผู้สั่ง:
+              </label>
+              <input
+                type="text"
+                placeholder="ชื่อของคุณ"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #CBD5E1', fontSize: '12.5px', boxSizing: 'border-box' }}
+              />
             </div>
-            <div>
-              ท่านสามารถ <strong>เลือกชมรายการอาหาร รูปภาพ ส่วนประกอบ และราคาล่วงหน้าได้ตามปกติ</strong> เมื่อทางร้านเปิดเครื่องแคชเชียร์หน้าร้าน ระบบจะปลดล็อกรับคำสั่งซื้อแบบเรียลไทม์ทันทีโดยไม่ต้องรีเฟรชหน้าจอ 
-              {storeInfo?.ownerPhone ? ` หรือท่านสามารถโทรติดต่อสอบถามทางร้านได้โดยตรงที่เบอร์ ${storeInfo.ownerPhone}` : ''}
+            <div style={{ flex: '1 1 130px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#0369A1', display: 'block', marginBottom: '2px' }}>
+                เบอร์โทรศัพท์ (ใช้ติดตามออเดอร์):
+              </label>
+              <input
+                type="tel"
+                placeholder="เช่น 0812345678"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #7DD3FC', fontSize: '12.5px', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ flex: '2 1 160px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '2px' }}>
+                หมายเหตุเพิ่มเติม:
+              </label>
+              <input
+                type="text"
+                placeholder="เช่น ไม่ใส่ผักชี, แยกน้ำจิ้ม"
+                value={tableNotes}
+                onChange={(e) => setTableNotes(e.target.value)}
+                style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #CBD5E1', fontSize: '12.5px', boxSizing: 'border-box' }}
+              />
             </div>
           </div>
         )}
       </div>
 
-      {/* Table Selector & Customer Information Banner */}
-      <div style={{
-        backgroundColor: '#FFF',
-        padding: '14px',
-        borderRadius: '8px',
-        marginBottom: '16px',
-        boxShadow: 'var(--shadow)',
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '12px',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        boxSizing: 'border-box',
-        width: '100%'
-      }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', width: '100%' }}>
-          {sessionParams.table ? (
-            <div style={{
-              flex: '1 1 180px',
-              backgroundColor: '#E8F5E9',
-              border: '1.5px solid #4CAF50',
-              padding: '6px 12px',
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <span style={{
-                backgroundColor: '#2E7D32',
-                color: '#FFF',
-                padding: '2px 8px',
-                borderRadius: '10px',
-                fontSize: '11.5px',
-                fontWeight: 'bold'
-              }}>
-                [ โต๊ะอาหาร: {sessionParams.table} ]
-              </span>
-              <span style={{ fontSize: '12px', color: '#1B5E20' }}>
-                สั่งประจำโต๊ะนี้
-              </span>
-            </div>
-          ) : (
-            <div style={{
-              flex: '1 1 240px',
-              backgroundColor: isReservation ? '#EFF6FF' : '#FFF7ED',
-              border: isReservation ? '1.5px solid #3B82F6' : '1.5px solid #F97316',
-              padding: '8px 12px',
-              borderRadius: '6px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{
-                  backgroundColor: isReservation ? '#1D4ED8' : '#C2410C',
-                  color: '#FFF',
-                  padding: '2px 8px',
-                  borderRadius: '10px',
-                  fontSize: '11.5px',
-                  fontWeight: 'bold'
-                }}>
-                  {isReservation ? '[ จองโต๊ะทานที่ร้านล่วงหน้า ]' : '[ สั่งออนไลน์ / Takeaway ]'}
-                </span>
-                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={isReservation}
-                    onChange={(e) => setIsReservation(e.target.checked)}
-                    style={{ width: '15px', height: '15px', cursor: 'pointer' }}
-                  />
-                  ต้องการจองโต๊ะล่วงหน้า
-                </label>
-              </div>
-              {isReservation ? (
-                <div style={{ marginTop: '6px' }}>
-                  <input
-                    type="text"
-                    placeholder="ระบุจำนวนท่าน และเวลาที่ต้องการจอง (เช่น 4 ท่าน เวลา 18:30 น.)"
-                    value={reservationInfo}
-                    onChange={(e) => setReservationInfo(e.target.value)}
-                    style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #93C5FD', fontSize: '12px', boxSizing: 'border-box' }}
-                  />
-                </div>
-              ) : (
-                <div style={{ fontSize: '11px', color: '#9A3412', marginTop: '3px' }}>
-                  สั่งซื้อกลับบ้าน / ล่วงหน้า กรุณาระบุเบอร์โทรเพื่อให้ทางร้านติดต่อแจ้งสถานะ
-                </div>
-              )}
-            </div>
-          )}
-
-          <div style={{ flex: '1 1 130px', minWidth: '120px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '2px', color: '#555' }}>
-              ชื่อผู้สั่ง (ไม่บังคับ):
-            </label>
-            <input
-              type="text"
-              placeholder="เช่น คุณสมชาย"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: '4px',
-                border: '1px solid #CCC',
-                fontSize: '13px'
-              }}
-            />
-          </div>
-
-          <div style={{ flex: '1 1 130px', minWidth: '120px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '2px', color: '#B91C1C' }}>
-              เบอร์โทรศัพท์ (จำเป็น): *
-            </label>
-            <input
-              type="tel"
-              placeholder="เช่น 0812345678"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: '4px',
-                border: '1.5px solid #F87171',
-                fontSize: '13px',
-                fontWeight: 'bold'
-              }}
-            />
-          </div>
-
-          <div style={{ flex: '2 1 160px', minWidth: '140px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '2px', color: '#555' }}>
-              หมายเหตุเพิ่มเติม (ไม่บังคับ):
-            </label>
-            <input
-              type="text"
-              placeholder="เช่น เวลามารับอาหาร หรือคำแนะนำพิเศษ"
-              value={tableNotes}
-              onChange={(e) => setTableNotes(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: '4px',
-                border: '1px solid #CCC',
-                fontSize: '13px'
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Phone-Based Real-time Order Tracking Section */}
-      <div id="order-tracking-section" style={{
-        backgroundColor: '#FFF',
-        borderRadius: '8px',
-        border: '1.5px solid #BAE6FD',
-        borderLeft: '5px solid #0284C7',
-        padding: '16px',
-        marginBottom: '16px',
-        boxShadow: 'var(--shadow)',
-        boxSizing: 'border-box',
-        width: '100%'
-      }}>
-        {/* Tracking Header Bar */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '10px'
+      {/* Active Order Quick Status Pill or Collapsible Tracking Section */}
+      {(trackedOrders.length > 0 || activeOrder || isTrackingSectionOpen) && (
+        <div id="order-tracking-section" style={{
+          backgroundColor: '#FFF',
+          borderRadius: '8px',
+          border: '1.5px solid #BAE6FD',
+          borderLeft: '5px solid #0284C7',
+          padding: '12px 14px',
+          marginBottom: '12px',
+          boxShadow: 'var(--shadow)',
+          boxSizing: 'border-box'
         }}>
-          <div>
+          {/* Tracking Bar Header */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '8px'
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{
                 backgroundColor: '#0284C7',
@@ -1710,93 +1771,117 @@ function CustomerView({
               }}>
                 [ ติดตามสถานะออเดอร์ ]
               </span>
-              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#0369A1', margin: 0 }}>
-                {trackedPhone ? `เบอร์โทรศัพท์ที่ติดตาม: ${trackedPhone}` : 'ตรวจสอบความคืบหน้าของออเดอร์'}
-              </h3>
+              {trackedPhone && (
+                <span style={{ fontSize: '12.5px', fontWeight: 'bold', color: '#0369A1' }}>
+                  {trackedPhone}
+                </span>
+              )}
             </div>
-            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
-              {trackedPhone 
-                ? 'ระบบอัปเดตสถานะแบบ Real-time ทันทีเมื่อห้องครัวหรือแคชเชียร์อัปเดตขั้นตอน' 
-                : 'กรุณากรอกเบอร์โทรศัพท์ที่ใช้สั่งอาหาร เพื่อติดตามสถานะการทำอาหารแบบเรียลไทม์'}
-            </div>
-          </div>
 
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {trackedPhone && (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {trackedPhone && (
+                <button
+                  type="button"
+                  onClick={() => fetchTrackedOrders(trackedPhone, true)}
+                  disabled={isTrackingLoading}
+                  style={{
+                    backgroundColor: '#F0F9FF',
+                    border: '1px solid #7DD3FC',
+                    color: '#0369A1',
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    fontSize: '11.5px',
+                    fontWeight: 'bold',
+                    cursor: isTrackingLoading ? 'wait' : 'pointer'
+                  }}
+                >
+                  {isTrackingLoading ? '[ กำลังอัปเดต... ]' : '[ รีเฟรช ]'}
+                </button>
+              )}
+              {trackedPhone && (
+                <button
+                  type="button"
+                  onClick={handleClearTrackingPhone}
+                  style={{
+                    backgroundColor: '#FFF',
+                    border: '1px solid #CBD5E1',
+                    color: '#475569',
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    fontSize: '11.5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  [ เปลี่ยนเบอร์โทร ]
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => fetchTrackedOrders(trackedPhone, true)}
-                disabled={isTrackingLoading}
-                style={{
-                  backgroundColor: '#F0F9FF',
-                  border: '1px solid #7DD3FC',
-                  color: '#0369A1',
-                  padding: '5px 12px',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  cursor: isTrackingLoading ? 'wait' : 'pointer'
-                }}
-              >
-                {isTrackingLoading ? '[ กำลังอัปเดต... ]' : '[ รีเฟรชสถานะ ]'}
-              </button>
-            )}
-
-            {trackedPhone && (
-              <button
-                type="button"
-                onClick={handleClearTrackingPhone}
+                onClick={() => setShowPhoneSearchBox(!showPhoneSearchBox)}
                 style={{
                   backgroundColor: '#FFF',
                   border: '1px solid #CBD5E1',
                   color: '#475569',
-                  padding: '5px 12px',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  cursor: 'pointer'
-                }}
-              >
-                [ เปลี่ยนเบอร์โทร ]
-              </button>
-            )}
-
-            {trackedOrders.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setIsTrackingCardExpanded(!isTrackingCardExpanded)}
-                style={{
-                  backgroundColor: '#F8FAFC',
-                  border: '1px solid #E2E8F0',
-                  color: '#475569',
-                  padding: '5px 10px',
+                  padding: '4px 10px',
                   borderRadius: '4px',
                   fontSize: '11.5px',
                   cursor: 'pointer'
                 }}
               >
-                {isTrackingCardExpanded ? '[ พับเก็บ ]' : `[ แสดงออเดอร์ (${trackedOrders.length}) ]`}
+                {showPhoneSearchBox ? '[ ปิดค้นหา ]' : '[ ค้นหาเบอร์อื่น ]'}
               </button>
-            )}
+              {(trackedOrders.length > 0 || activeOrder) && (
+                <button
+                  type="button"
+                  onClick={() => setIsTrackingCardExpanded(!isTrackingCardExpanded)}
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    border: '1px solid #CBD5E1',
+                    color: '#334155',
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    fontSize: '11.5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {isTrackingCardExpanded ? '[ พับเก็บ ]' : '[ ดูสถานะ ]'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsTrackingSectionOpen(false)}
+                title="ซ่อนแถบติดตามออเดอร์"
+                style={{
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  color: '#94A3B8',
+                  padding: '4px 6px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                [ X ]
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Input box for Phone Search */}
-        {(!trackedPhone || showPhoneSearchBox) && (
-          <div style={{
-            marginTop: '12px',
-            backgroundColor: '#F8FAFC',
-            border: '1px solid #E2E8F0',
-            borderRadius: '6px',
-            padding: '12px',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px',
-            alignItems: 'center'
-          }}>
-            <div style={{ flex: '1 1 200px' }}>
+          {/* Input box for Phone Search */}
+          {showPhoneSearchBox && (
+            <div style={{
+              marginTop: '10px',
+              backgroundColor: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              borderRadius: '6px',
+              padding: '10px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '8px',
+              alignItems: 'center'
+            }}>
               <input
                 type="tel"
-                placeholder="กรุณากรอกเบอร์โทรเพื่อติดตามออเดอร์ เช่น 0812345678"
+                placeholder="กรุณากรอกเบอร์โทรเพื่อติดตามออเดอร์"
                 value={trackPhoneInput}
                 onChange={(e) => setTrackPhoneInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -1805,227 +1890,211 @@ function CustomerView({
                   }
                 }}
                 style={{
-                  width: '100%',
-                  padding: '8px 12px',
+                  flex: '1 1 180px',
+                  padding: '6px 10px',
                   borderRadius: '4px',
                   border: '1px solid #94A3B8',
-                  fontSize: '13px',
+                  fontSize: '12.5px',
                   boxSizing: 'border-box'
                 }}
               />
-            </div>
-            <button
-              type="button"
-              onClick={() => fetchTrackedOrders(trackPhoneInput, true)}
-              disabled={isTrackingLoading}
-              style={{
-                backgroundColor: '#0284C7',
-                color: '#FFF',
-                border: 'none',
-                padding: '8px 16px',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: 'bold',
-                cursor: isTrackingLoading ? 'wait' : 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {isTrackingLoading ? '[ กำลังค้นหา... ]' : '[ ค้นหาออเดอร์ ]'}
-            </button>
-            {trackedPhone && (
               <button
                 type="button"
-                onClick={() => setShowPhoneSearchBox(false)}
+                onClick={() => fetchTrackedOrders(trackPhoneInput, true)}
+                disabled={isTrackingLoading}
                 style={{
-                  backgroundColor: '#FFF',
-                  color: '#64748B',
-                  border: '1px solid #CBD5E1',
-                  padding: '8px 12px',
+                  backgroundColor: '#0284C7',
+                  color: '#FFF',
+                  border: 'none',
+                  padding: '6px 14px',
                   borderRadius: '4px',
-                  fontSize: '13px',
-                  cursor: 'pointer'
+                  fontSize: '12.5px',
+                  fontWeight: 'bold',
+                  cursor: isTrackingLoading ? 'wait' : 'pointer'
                 }}
               >
-                [ ยกเลิก ]
+                [ ค้นหา ]
               </button>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Error message */}
-        {trackingError && (
-          <div style={{
-            marginTop: '10px',
-            backgroundColor: '#FEF2F2',
-            border: '1px solid #FCA5A5',
-            color: '#B91C1C',
-            padding: '8px 12px',
-            borderRadius: '4px',
-            fontSize: '12px',
-            fontWeight: 'bold'
-          }}>
-            [ ข้อความ: {trackingError} ]
-          </div>
-        )}
+          {/* Error message */}
+          {trackingError && (
+            <div style={{
+              marginTop: '8px',
+              backgroundColor: '#FEF2F2',
+              border: '1px solid #FCA5A5',
+              color: '#B91C1C',
+              padding: '6px 10px',
+              borderRadius: '4px',
+              fontSize: '11.5px',
+              fontWeight: 'bold'
+            }}>
+              [ {trackingError} ]
+            </div>
+          )}
 
-        {/* Order Cards List */}
-        {isTrackingCardExpanded && (trackedOrders.length > 0 || activeOrder) && (
-          <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {(trackedOrders.length > 0 ? trackedOrders : (activeOrder ? [activeOrder] : [])).map((ord) => {
-              const isOrderActive = ord.status < 5;
-              const isReady = ord.status === 4;
-              const isCompleted = ord.status === 5;
-              const isCancelled = ord.status === 6;
+          {/* Order Cards List */}
+          {isTrackingCardExpanded && (trackedOrders.length > 0 || activeOrder) && (
+            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {(trackedOrders.length > 0 ? trackedOrders : (activeOrder ? [activeOrder] : [])).map((ord) => {
+                const isOrderActive = ord.status < 5;
+                const isReady = ord.status === 4;
+                const isCompleted = ord.status === 5;
+                const isCancelled = ord.status === 6;
 
-              return (
-                <div
-                  key={ord.id}
-                  style={{
-                    backgroundColor: isReady ? '#F0FDF4' : (isOrderActive ? '#F8FAFC' : '#FFF'),
-                    border: isReady ? '1.5px solid #22C55E' : (isOrderActive ? '1px solid #CBD5E1' : '1px solid #E2E8F0'),
-                    borderRadius: '6px',
-                    padding: '12px 14px'
-                  }}
-                >
-                  {/* Order Card Header */}
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '6px',
-                    marginBottom: '8px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#0F172A' }}>
-                        บิล #{ord.orderNumber}
-                      </span>
-                      <span style={{
-                        backgroundColor: '#E2E8F0',
-                        color: '#334155',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: 'bold'
-                      }}>
-                        {ord.tableNumber || (ord.type === 2 ? 'สั่งกลับบ้าน' : 'สั่งออนไลน์')}
-                      </span>
-                      <span style={{ fontSize: '11.5px', color: '#64748B' }}>
-                        เวลา: {new Date(ord.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
-                      </span>
-                    </div>
-
-                    <div>
-                      <span style={{
-                        backgroundColor: isCancelled ? '#EF4444' : (isReady ? '#16A34A' : (isCompleted ? '#64748B' : '#0284C7')),
-                        color: '#FFF',
-                        padding: '3px 10px',
-                        borderRadius: '12px',
-                        fontSize: '11.5px',
-                        fontWeight: 'bold'
-                      }}>
-                        [ {getStatusText(ord.status)} ]
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Stepper Timeline for Active / In-progress Orders */}
-                  {!isCancelled && (
+                return (
+                  <div
+                    key={ord.id}
+                    style={{
+                      backgroundColor: isReady ? '#F0FDF4' : (isOrderActive ? '#F8FAFC' : '#FFF'),
+                      border: isReady ? '1.5px solid #22C55E' : (isOrderActive ? '1px solid #CBD5E1' : '1px solid #E2E8F0'),
+                      borderRadius: '6px',
+                      padding: '10px 12px'
+                    }}
+                  >
+                    {/* Order Card Header */}
                     <div style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      position: 'relative',
-                      margin: '12px 0 10px',
-                      padding: '4px 0'
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '6px',
+                      marginBottom: '6px'
                     }}>
-                      {[
-                        { step: 1, label: 'รอรับออเดอร์' },
-                        { step: 2, label: 'รับออเดอร์' },
-                        { step: 3, label: 'กำลังปรุง' },
-                        { step: 4, label: 'พร้อมเสิร์ฟ' },
-                        { step: 5, label: 'เสร็จสิ้น' }
-                      ].map((s) => {
-                        const isPassed = ord.status >= s.step;
-                        const isCurrent = ord.status === s.step;
-                        return (
-                          <div key={s.step} style={{ textAlign: 'center', flex: 1 }}>
-                            <div style={{
-                              width: '26px',
-                              height: '26px',
-                              borderRadius: '50%',
-                              backgroundColor: isCurrent 
-                                ? (s.step === 4 ? '#16A34A' : '#0284C7') 
-                                : (isPassed ? '#10B981' : '#E2E8F0'),
-                              color: isPassed || isCurrent ? '#FFF' : '#64748B',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              margin: '0 auto 4px',
-                              fontSize: '11px',
-                              fontWeight: 'bold',
-                              boxShadow: isCurrent ? '0 0 8px rgba(2, 132, 199, 0.5)' : 'none'
-                            }}>
-                              {s.step}
-                            </div>
-                            <div style={{
-                              fontSize: '10.5px',
-                              fontWeight: isCurrent ? 'bold' : 'normal',
-                              color: isCurrent ? '#0284C7' : (isPassed ? '#10B981' : '#94A3B8')
-                            }}>
-                              {s.label}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '13.5px', color: '#0F172A' }}>
+                          บิล #{ord.orderNumber}
+                        </span>
+                        <span style={{
+                          backgroundColor: '#E2E8F0',
+                          color: '#334155',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: 'bold'
+                        }}>
+                          {ord.tableNumber || (ord.type === 2 ? 'สั่งกลับบ้าน' : 'สั่งออนไลน์')}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#64748B' }}>
+                          เวลา: {new Date(ord.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
+                        </span>
+                      </div>
 
-                  {/* Items summary */}
-                  <div style={{
-                    marginTop: '8px',
-                    paddingTop: '8px',
-                    borderTop: '1px dashed #E2E8F0',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    flexWrap: 'wrap',
-                    gap: '8px',
-                    fontSize: '12px'
-                  }}>
-                    <div style={{ color: '#475569' }}>
-                      {ord.items && ord.items.map((it, idx) => (
-                        <div key={idx} style={{ marginBottom: '2px' }}>
-                          • {it.quantity}x {it.productName}
-                          {it.specialNotes && <span style={{ color: '#E11D48', marginLeft: '4px' }}>({it.specialNotes})</span>}
-                        </div>
-                      ))}
-                      {ord.notes && (
-                        <div style={{ color: '#2563EB', fontWeight: 'bold', marginTop: '4px' }}>
-                          หมายเหตุ: {ord.notes}
-                        </div>
-                      )}
+                      <div>
+                        <span style={{
+                          backgroundColor: isCancelled ? '#EF4444' : (isReady ? '#16A34A' : (isCompleted ? '#64748B' : '#0284C7')),
+                          color: '#FFF',
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          fontSize: '11px',
+                          fontWeight: 'bold'
+                        }}>
+                          [ {getStatusText(ord.status)} ]
+                        </span>
+                      </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#0F172A' }}>
-                        ยอดรวม: {ord.totalAmount.toFixed(2)} บาท
+
+                    {/* Stepper Timeline for Active / In-progress Orders */}
+                    {!isCancelled && (
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        position: 'relative',
+                        margin: '8px 0 6px',
+                        padding: '2px 0'
+                      }}>
+                        {[
+                          { step: 1, label: 'รอรับออเดอร์' },
+                          { step: 2, label: 'รับออเดอร์' },
+                          { step: 3, label: 'กำลังปรุง' },
+                          { step: 4, label: 'พร้อมเสิร์ฟ' },
+                          { step: 5, label: 'เสร็จสิ้น' }
+                        ].map((s) => {
+                          const isPassed = ord.status >= s.step;
+                          const isCurrent = ord.status === s.step;
+                          return (
+                            <div key={s.step} style={{ textAlign: 'center', flex: 1 }}>
+                              <div style={{
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '50%',
+                                backgroundColor: isCurrent 
+                                  ? (s.step === 4 ? '#16A34A' : '#0284C7') 
+                                  : (isPassed ? '#10B981' : '#E2E8F0'),
+                                color: isPassed || isCurrent ? '#FFF' : '#64748B',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 3px',
+                                fontSize: '10px',
+                                fontWeight: 'bold'
+                              }}>
+                                {s.step}
+                              </div>
+                              <div style={{
+                                fontSize: '9.5px',
+                                fontWeight: isCurrent ? 'bold' : 'normal',
+                                color: isCurrent ? '#0284C7' : (isPassed ? '#10B981' : '#94A3B8')
+                              }}>
+                                {s.label}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Items summary */}
+                    <div style={{
+                      marginTop: '6px',
+                      paddingTop: '6px',
+                      borderTop: '1px dashed #E2E8F0',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      flexWrap: 'wrap',
+                      gap: '6px',
+                      fontSize: '11.5px'
+                    }}>
+                      <div style={{ color: '#475569' }}>
+                        {ord.items && ord.items.map((it, idx) => (
+                          <div key={idx} style={{ marginBottom: '1px' }}>
+                            • {it.quantity}x {it.productName}
+                            {it.specialNotes && <span style={{ color: '#E11D48', marginLeft: '4px' }}>({it.specialNotes})</span>}
+                          </div>
+                        ))}
+                        {ord.notes && (
+                          <div style={{ color: '#2563EB', fontWeight: 'bold', marginTop: '3px' }}>
+                            หมายเหตุ: {ord.notes}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#0F172A' }}>
+                          ยอดรวม: {ord.totalAmount.toFixed(2)} บาท
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Categories Horizontal Pills */}
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        overflowX: 'auto',
-        paddingBottom: '10px',
-        marginBottom: '16px'
-      }}>
+      <div 
+        className="pos-category-scroll"
+        style={{
+          display: 'flex',
+          gap: '8px',
+          overflowX: 'auto',
+          paddingBottom: '8px',
+          marginBottom: '14px'
+        }}
+      >
         <button
           onClick={() => setSelectedCategory(null)}
           style={{
@@ -2064,12 +2133,7 @@ function CustomerView({
       </div>
 
       {/* Food Menu Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-        gap: '16px',
-        paddingBottom: '80px'
-      }}>
+      <div className="pos-food-grid">
         {filteredProducts.length === 0 && (
           <div style={{
             gridColumn: '1 / -1',
@@ -2129,12 +2193,11 @@ function CustomerView({
             >
               {/* Product Image Area with Click-to-Enlarge Preview */}
               <div 
+                className="pos-food-card-img"
                 onClick={() => setPreviewProduct(p)}
                 title="คลิกเพื่อดูภาพเมนูขนาดใหญ่"
                 style={{ 
                   position: 'relative', 
-                  width: '100%', 
-                  height: '140px', 
                   backgroundColor: '#ECEFF1', 
                   overflow: 'hidden',
                   cursor: 'pointer'
@@ -2204,7 +2267,7 @@ function CustomerView({
               </div>
 
               {/* Card Body */}
-              <div style={{ padding: '14px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div className="pos-food-card-body">
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <span style={{ fontSize: '11px', color: '#888' }}>
@@ -2220,7 +2283,7 @@ function CustomerView({
                       </span>
                     )}
                   </div>
-                  <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '6px', color: isSoldOut ? '#555' : '#222' }}>
+                  <h3 style={{ fontSize: '14.5px', fontWeight: 'bold', marginBottom: '6px', color: isSoldOut ? '#555' : '#222', lineHeight: '1.3' }}>
                     {p.name}
                   </h3>
 
@@ -2241,13 +2304,13 @@ function CustomerView({
                     </div>
                   )}
 
-                  <p style={{ fontSize: '12px', color: isSoldOut ? '#888' : '#666', marginBottom: '12px' }}>
+                  <p style={{ fontSize: '12px', color: isSoldOut ? '#888' : '#666', marginBottom: '10px', lineHeight: '1.4' }}>
                     {p.description || 'อาหารจานโปรด ปรุงสดใหม่ตามสั่ง'}
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-                  <span style={{ fontSize: '16px', fontWeight: 'bold', color: isSoldOut ? '#757575' : '#1976D2' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                  <span style={{ fontSize: '15px', fontWeight: 'bold', color: isSoldOut ? '#757575' : '#1976D2' }}>
                     {p.price.toFixed(2)} บาท
                   </span>
                   
@@ -2258,14 +2321,14 @@ function CustomerView({
                         backgroundColor: '#B0BEC5',
                         color: '#FFF',
                         border: 'none',
-                        padding: '6px 14px',
+                        padding: '6px 12px',
                         borderRadius: '4px',
                         fontWeight: 'bold',
-                        fontSize: '12px',
+                        fontSize: '11.5px',
                         cursor: 'not-allowed'
                       }}
                     >
-                      [ หมด ] สั่งไม่ได้
+                      [ หมด ]
                     </button>
                   ) : (
                     <button
@@ -2277,7 +2340,7 @@ function CustomerView({
                         padding: '6px 14px',
                         borderRadius: '4px',
                         fontWeight: 'bold',
-                        fontSize: '13px',
+                        fontSize: '12.5px',
                         cursor: 'pointer'
                       }}
                     >
@@ -2947,6 +3010,14 @@ function CustomerView({
           </div>
         </div>
       )}
+
+      {/* Table Reservation Modal */}
+      {showReservationModal && (
+        <TableReservationModal
+          storeInfo={storeInfo}
+          onClose={() => setShowReservationModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -3297,18 +3368,36 @@ function KitchenView() {
 // 3. Management, Menu & Reports View
 // -------------------------------------------------------------
 function ManagementView() {
-  const [subTab, setSubTab] = useState<'sales' | 'menu' | 'stock' | 'audit'>('sales');
+  const [subTab, setSubTab] = useState<'sales' | 'menu' | 'stock' | 'audit' | 'backup'>('sales');
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>
           ระบบจัดการร้านและหลังบ้าน (Store Management &amp; Settings)
         </h2>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => downloadStoreBackup()}
+            style={{
+              padding: '8px 14px',
+              borderRadius: '4px',
+              border: '1px solid #1976D2',
+              backgroundColor: '#E3F2FD',
+              color: '#0D47A1',
+              fontWeight: 'bold',
+              fontSize: '12.5px',
+              cursor: 'pointer'
+            }}
+            title="ดาวน์โหลดไฟล์สำรองข้อมูลร้านค้านี้ในรูปแบบ JSON ทันที"
+          >
+            [ส่งออก/สำรองข้อมูล JSON]
+          </button>
+        </div>
       </div>
 
       {/* Sub Tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '2px solid #E0E0E0', paddingBottom: '8px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '2px solid #E0E0E0', paddingBottom: '8px', overflowX: 'auto' }}>
         <button
           onClick={() => setSubTab('sales')}
           style={{
@@ -3318,7 +3407,9 @@ function ManagementView() {
             backgroundColor: subTab === 'sales' ? '#1976D2' : '#F5F5F5',
             color: subTab === 'sales' ? '#FFF' : '#333',
             fontWeight: 'bold',
-            fontSize: '13px'
+            fontSize: '13px',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
           }}
         >
           สรุปยอดขาย (Sales Dashboard)
@@ -3333,7 +3424,8 @@ function ManagementView() {
             color: subTab === 'menu' ? '#FFF' : '#333',
             fontWeight: 'bold',
             fontSize: '13px',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
           }}
         >
           จัดการรายการอาหาร &amp; หมวดหมู่
@@ -3348,7 +3440,8 @@ function ManagementView() {
             color: subTab === 'stock' ? '#FFF' : '#333',
             fontWeight: 'bold',
             fontSize: '13px',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
           }}
         >
           จัดการสต๊อกวัตถุดิบ (Raw Material Inventory)
@@ -3363,10 +3456,27 @@ function ManagementView() {
             color: subTab === 'audit' ? '#FFF' : '#333',
             fontWeight: 'bold',
             fontSize: '13px',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
           }}
         >
           ประวัติการใช้งาน (Audit Logs)
+        </button>
+        <button
+          onClick={() => setSubTab('backup')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '4px',
+            border: 'none',
+            backgroundColor: subTab === 'backup' ? '#1976D2' : '#F5F5F5',
+            color: subTab === 'backup' ? '#FFF' : '#333',
+            fontWeight: 'bold',
+            fontSize: '13px',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          สำรองข้อมูล &amp; ส่งออก (Backup &amp; Export)
         </button>
       </div>
 
@@ -3374,6 +3484,7 @@ function ManagementView() {
       {subTab === 'menu' && <MenuManagementView />}
       {subTab === 'stock' && <StockManagementView />}
       {subTab === 'audit' && <AuditLogManagementView />}
+      {subTab === 'backup' && <BackupManagementView />}
     </div>
   );
 }
@@ -3396,9 +3507,14 @@ function SalesDashboardView() {
       loadReport();
     });
 
+    const unsubStatus = realtimeService.onOrderStatusChanged(() => {
+      loadReport();
+    });
+
     return () => {
       unsubBill();
       unsubNew();
+      unsubStatus();
     };
   }, []);
 
@@ -5232,6 +5348,227 @@ function AuditLogManagementView() {
 }
 
 // -------------------------------------------------------------
+// 3.5 Backup & Data Export Management
+// -------------------------------------------------------------
+function BackupManagementView() {
+  const [backupData, setBackupData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [statusMessage, setStatusMessage] = useState<string>('');
+
+  useEffect(() => {
+    loadBackupData();
+  }, []);
+
+  const loadBackupData = async () => {
+    setIsLoading(true);
+    setStatusMessage('');
+    try {
+      const data = await exportStoreBackup();
+      setBackupData(data);
+    } catch (err: any) {
+      logError('Failed to load backup data: ' + err.message, err);
+      setStatusMessage('ไม่สามารถโหลดข้อมูลสำรองได้: ' + (err.message || ''));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDownload = () => {
+    setIsDownloading(true);
+    try {
+      downloadStoreBackup();
+      setStatusMessage('ส่งคำขอดาวน์โหลดไฟล์สำรองข้อมูล JSON เรียบร้อยแล้ว');
+    } catch (err: any) {
+      setStatusMessage('เกิดข้อผิดพลาดในการดาวน์โหลด: ' + (err.message || ''));
+    } finally {
+      setTimeout(() => setIsDownloading(false), 1500);
+    }
+  };
+
+  const stats = backupData?.statistics;
+
+  return (
+    <div style={{ backgroundColor: '#FFF', padding: '24px', borderRadius: '8px', boxShadow: 'var(--shadow)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+        <div>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#0D47A1' }}>
+            สำรองและส่งออกข้อมูลร้านค้า (Store Data Backup &amp; Export)
+          </h3>
+          <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#555' }}>
+            ส่งออกข้อมูลร้านค้าฉบับสมบูรณ์ (หมวดหมู่, เมนู, วัตถุดิบ, โต๊ะอาหาร, ประวัติคำสั่งซื้อ) ในรูปแบบ JSON เพื่อความปลอดภัยสูงสุด
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={loadBackupData}
+            disabled={isLoading}
+            style={{
+              backgroundColor: '#FFF',
+              border: '1px solid #CCC',
+              padding: '8px 14px',
+              borderRadius: '4px',
+              fontWeight: 600,
+              fontSize: '12.5px',
+              cursor: isLoading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {isLoading ? 'กำลังโหลด...' : 'รีเฟรชข้อมูล'}
+          </button>
+          <button
+            onClick={handleDownload}
+            disabled={isDownloading}
+            style={{
+              backgroundColor: '#1976D2',
+              color: '#FFF',
+              border: 'none',
+              padding: '8px 18px',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              fontSize: '12.5px',
+              cursor: isDownloading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {isDownloading ? 'กำลังเตรียมไฟล์...' : '[ดาวน์โหลดไฟล์สำรอง JSON]'}
+          </button>
+        </div>
+      </div>
+
+      {statusMessage && (
+        <div style={{
+          backgroundColor: statusMessage.includes('ไม่สามารถ') || statusMessage.includes('ข้อผิดพลาด') ? '#FFEBEE' : '#E8F5E9',
+          color: statusMessage.includes('ไม่สามารถ') || statusMessage.includes('ข้อผิดพลาด') ? '#C62828' : '#2E7D32',
+          padding: '10px 14px',
+          borderRadius: '6px',
+          fontSize: '13px',
+          marginBottom: '16px',
+          fontWeight: 600
+        }}>
+          {statusMessage}
+        </div>
+      )}
+
+      {/* Database Isolation Badge & Notice */}
+      <div style={{
+        backgroundColor: '#F0F7FF',
+        border: '1px solid #BBDEFB',
+        borderRadius: '6px',
+        padding: '14px 16px',
+        marginBottom: '20px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+          <span style={{
+            backgroundColor: '#1565C0',
+            color: '#FFF',
+            padding: '2px 8px',
+            borderRadius: '4px',
+            fontSize: '11px',
+            fontWeight: 'bold'
+          }}>
+            [ระบบแยกฐานข้อมูล 1 ร้าน = 1 ฐานข้อมูล (Multi-Tenant Isolation)]
+          </span>
+          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#0D47A1' }}>
+            รหัสร้านค้า: {backupData?.store?.storeCode || getStoredTenantCode() || 'DEFAULT'}
+          </span>
+        </div>
+        <p style={{ margin: 0, fontSize: '12.5px', color: '#333', lineHeight: '1.6' }}>
+          ข้อมูลร้านค้าของท่านจัดเก็บในฐานข้อมูลแยกต่างหากเฉพาะร้าน (Isolated Database) 
+          ไม่ปะปนกับร้านค้าอื่นโดยเด็ดขาด การสำรองข้อมูลจะดึงเฉพาะข้อมูลของร้านท่านอย่างครบถ้วน 100%
+        </p>
+      </div>
+
+      {isLoading ? (
+        <div style={{ padding: '30px', textAlign: 'center', color: '#666' }}>กำลังเตรียมข้อมูลสำรอง...</div>
+      ) : (
+        <div>
+          {/* Summary Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '12px',
+            marginBottom: '20px'
+          }}>
+            <div style={{ padding: '14px', backgroundColor: '#F8F9FA', borderRadius: '6px', border: '1px solid #E0E0E0' }}>
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>หมวดหมู่อาหาร</div>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1976D2' }}>
+                {backupData?.categories?.length || stats?.categoryCount || 0} รายการ
+              </div>
+            </div>
+            <div style={{ padding: '14px', backgroundColor: '#F8F9FA', borderRadius: '6px', border: '1px solid #E0E0E0' }}>
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>รายการเมนูอาหาร</div>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#2E7D32' }}>
+                {backupData?.products?.length || stats?.productCount || 0} รายการ
+              </div>
+            </div>
+            <div style={{ padding: '14px', backgroundColor: '#F8F9FA', borderRadius: '6px', border: '1px solid #E0E0E0' }}>
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>วัตถุดิบในสต๊อก</div>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#E65100' }}>
+                {backupData?.ingredients?.length || stats?.ingredientCount || 0} รายการ
+              </div>
+            </div>
+            <div style={{ padding: '14px', backgroundColor: '#F8F9FA', borderRadius: '6px', border: '1px solid #E0E0E0' }}>
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>โต๊ะอาหาร / คิวสั่ง</div>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#6A1B9A' }}>
+                {backupData?.tables?.length || stats?.tableCount || 0} รายการ
+              </div>
+            </div>
+            <div style={{ padding: '14px', backgroundColor: '#F8F9FA', borderRadius: '6px', border: '1px solid #E0E0E0' }}>
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>คำสั่งซื้อทั้งหมด</div>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#00838F' }}>
+                {backupData?.orders?.length || stats?.orderCount || 0} ออเดอร์
+              </div>
+            </div>
+            <div style={{ padding: '14px', backgroundColor: '#F8F9FA', borderRadius: '6px', border: '1px solid #E0E0E0' }}>
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>ยอดขายสะสมที่บันทึก</div>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#D32F2F' }}>
+                {(stats?.totalRevenue ?? 0).toLocaleString()} ฿
+              </div>
+            </div>
+          </div>
+
+          {/* Details Table */}
+          <div style={{ border: '1px solid #E0E0E0', borderRadius: '6px', overflow: 'hidden' }}>
+            <div style={{ padding: '10px 14px', backgroundColor: '#F5F5F5', fontWeight: 'bold', fontSize: '13px', borderBottom: '1px solid #E0E0E0' }}>
+              ข้อมูลจำเพาะของการส่งออก (Export Manifest)
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid #EEE' }}>
+                  <td style={{ padding: '10px 14px', color: '#666', width: '220px', fontWeight: 'bold' }}>รหัสร้านค้า (Store Code)</td>
+                  <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 'bold', color: '#1565C0' }}>
+                    {backupData?.store?.storeCode || getStoredTenantCode() || 'DEFAULT'}
+                  </td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #EEE' }}>
+                  <td style={{ padding: '10px 14px', color: '#666', fontWeight: 'bold' }}>ชื่อร้านค้า (Store Name)</td>
+                  <td style={{ padding: '10px 14px' }}>{backupData?.store?.storeName || '-'}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #EEE' }}>
+                  <td style={{ padding: '10px 14px', color: '#666', fontWeight: 'bold' }}>เวลาที่สร้างข้อมูลสำรอง</td>
+                  <td style={{ padding: '10px 14px' }}>
+                    {backupData?.exportedAt ? new Date(backupData.exportedAt).toLocaleString() : '-'}
+                  </td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #EEE' }}>
+                  <td style={{ padding: '10px 14px', color: '#666', fontWeight: 'bold' }}>เวอร์ชันระบบ</td>
+                  <td style={{ padding: '10px 14px' }}>{backupData?.version || '1.0'}</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '10px 14px', color: '#666', fontWeight: 'bold' }}>ประวัติการทำงาน (Audit Logs)</td>
+                  <td style={{ padding: '10px 14px' }}>
+                    {backupData?.auditLogs?.length || stats?.auditLogCount || 0} รายการ
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
 // 4. Staff Login Modal
 // -------------------------------------------------------------
 interface LoginModalProps {
@@ -5738,11 +6075,16 @@ function RegisterStoreModal({ onClose, onSuccess }: RegisterStoreModalProps) {
   const [storeName, setStoreName] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
+  const [address, setAddress] = useState('');
   const [adminPassword, setAdminPassword] = useState('123456');
+  const [confirmPassword, setConfirmPassword] = useState('123456');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [createdStore, setCreatedStore] = useState<StoreInfo | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedApiUrl, setCopiedApiUrl] = useState(false);
+
+  const serverApiUrl = typeof window !== 'undefined' ? (getServerUrl() || window.location.origin) : 'https://spk.p-services.net';
 
   const randomizeCode = () => {
     setStoreCode(`SHOP${Math.floor(1000 + Math.random() * 9000)}`);
@@ -5775,6 +6117,14 @@ function RegisterStoreModal({ onClose, onSuccess }: RegisterStoreModalProps) {
       setError('กรุณากรอกเบอร์โทรศัพท์ติดต่อ');
       return;
     }
+    if (!adminPassword || adminPassword.length < 4) {
+      setError('รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+      return;
+    }
+    if (adminPassword !== confirmPassword) {
+      setError('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -5783,8 +6133,10 @@ function RegisterStoreModal({ onClose, onSuccess }: RegisterStoreModalProps) {
         storeName: storeName.trim(),
         ownerName: ownerName.trim() || 'เจ้าของร้าน',
         ownerPhone: ownerPhone.trim(),
+        address: address.trim(),
         adminUsername: 'admin',
-        adminPassword: adminPassword.trim() || '123456'
+        adminPassword: adminPassword.trim() || '123456',
+        confirmPassword: confirmPassword.trim() || '123456'
       });
       setCreatedStore(res);
     } catch (err: any) {
@@ -5928,9 +6280,31 @@ function RegisterStoreModal({ onClose, onSuccess }: RegisterStoreModalProps) {
         ) : (
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#111', margin: 0 }}>
-                เปิดร้านใหม่ — ทดลองใช้งานฟรี
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#111', margin: 0 }}>
+                  เปิดร้านใหม่ — ทดลองใช้งานฟรี
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    window.open('/?page=register', '_blank');
+                  }}
+                  style={{
+                    backgroundColor: '#E3F2FD',
+                    color: '#0D47A1',
+                    border: '1px solid #90CAF9',
+                    borderRadius: '4px',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                  title="เปิดหน้าลงทะเบียนร้านค้าใหม่ในหน้าต่างใหม่"
+                >
+                  [ เปิดหน้าต่างใหม่ ]
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={onClose}
@@ -5972,6 +6346,28 @@ function RegisterStoreModal({ onClose, onSuccess }: RegisterStoreModalProps) {
               />
             </div>
 
+            {/* Store Address */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ fontSize: '12.5px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
+                ที่อยู่ร้านค้า (Store Address)
+              </label>
+              <textarea
+                rows={2}
+                placeholder="เลขที่, ถนน, แขวง/ตำบล, เขต/อำเภอ, จังหวัด, รหัสไปรษณีย์ (สำหรับพิมพ์หัวบิลสลิปใบเสร็จ)"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #CCC',
+                  fontSize: '13px',
+                  boxSizing: 'border-box',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
             {/* Owner Details */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
               <div>
@@ -6001,24 +6397,51 @@ function RegisterStoreModal({ onClose, onSuccess }: RegisterStoreModalProps) {
               </div>
             </div>
 
-            {/* Admin Password */}
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '12.5px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
-                กำหนดรหัสผ่านเข้าใช้งานโปรแกรม *
-              </label>
-              <input
-                type="text"
-                placeholder="เช่น 123456"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CCC', fontSize: '13px' }}
-                required
-              />
-              <span style={{ fontSize: '11px', color: '#888' }}>ใช้สำหรับเข้าสู่ระบบในโปรแกรม POS หน้าร้าน (ค่าเริ่มต้น: 123456)</span>
+            {/* Admin Password & Confirm Password */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
+              <div>
+                <label style={{ fontSize: '12.5px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
+                  พาสเวิร์ดเข้าใช้งาน *
+                </label>
+                <input
+                  type="password"
+                  placeholder="เช่น 123456"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CCC', fontSize: '13px' }}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '12.5px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
+                  คอนเฟิมพาสเวิร์ดอีกครั้ง *
+                </label>
+                <input
+                  type="password"
+                  placeholder="กรอกพาสเวิร์ดซ้ำอีกครั้ง"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '6px',
+                    border: `1px solid ${confirmPassword && confirmPassword !== adminPassword ? '#D32F2F' : '#CCC'}`,
+                    fontSize: '13px'
+                  }}
+                  required
+                />
+              </div>
+            </div>
+            <div style={{ fontSize: '11px', color: '#666', marginBottom: '14px' }}>
+              {confirmPassword && confirmPassword !== adminPassword ? (
+                <span style={{ color: '#D32F2F', fontWeight: 'bold' }}>[คำเตือน] พาสเวิร์ดและคอนเฟิมพาสเวิร์ดยังไม่ตรงกัน</span>
+              ) : (
+                <span>ใช้สำหรับเข้าสู่ระบบในโปรแกรม POS หน้าร้าน (ค่าเริ่มต้น: 123456)</span>
+              )}
             </div>
 
             {/* Store Code (Connection Key) */}
-            <div style={{ marginBottom: '18px' }}>
+            <div style={{ marginBottom: '14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                 <label style={{ fontSize: '12.5px', fontWeight: 'bold' }}>
                   รหัสเชื่อมต่อร้านของคุณ (สร้างให้อัตโนมัติ) *
@@ -6057,8 +6480,70 @@ function RegisterStoreModal({ onClose, onSuccess }: RegisterStoreModalProps) {
                 required
               />
               <span style={{ fontSize: '11px', color: '#666' }}>
-                รหัสนี้จะใช้สำหรับนำไปกรอกในโปรแกรม POS บนคอมพิวเตอร์ของคุณเพื่อเชื่อมต่อร้าน
+                รหัสนี้คือ "ไอดีร้านค้า" สำหรับนำไปกรอกล็อกอินในโปรแกรม POS บนคอมพิวเตอร์ของคุณ
               </span>
+            </div>
+
+            {/* API Connection URL Box */}
+            <div style={{
+              backgroundColor: '#E8EAF6',
+              border: '1px solid #9FA8DA',
+              borderRadius: '6px',
+              padding: '10px 12px',
+              marginBottom: '14px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap', gap: '4px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1A237E' }}>
+                  API สำหรับเชื่อมต่อโปรแกรม:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(serverApiUrl);
+                    setCopiedApiUrl(true);
+                    setTimeout(() => setCopiedApiUrl(false), 2500);
+                  }}
+                  style={{
+                    backgroundColor: copiedApiUrl ? '#2E7D32' : '#283593',
+                    color: '#FFF',
+                    border: 'none',
+                    padding: '3px 8px',
+                    borderRadius: '3px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {copiedApiUrl ? '[ คัดลอกสำเร็จ ]' : '[ คัดลอก API ]'}
+                </button>
+              </div>
+              <div style={{
+                backgroundColor: '#FFF',
+                border: '1px solid #C5CAE9',
+                borderRadius: '4px',
+                padding: '6px 8px',
+                fontFamily: 'Consolas, monospace',
+                fontSize: '12px',
+                color: '#1A237E',
+                fontWeight: 'bold',
+                wordBreak: 'break-all'
+              }}>
+                {serverApiUrl}
+              </div>
+            </div>
+
+            {/* Guidance Callout */}
+            <div style={{
+              backgroundColor: '#FFF9C4',
+              border: '1px solid #FBC02D',
+              borderRadius: '6px',
+              padding: '10px 12px',
+              marginBottom: '14px',
+              fontSize: '12px',
+              color: '#E65100',
+              lineHeight: '1.4'
+            }}>
+              <strong>คำแนะนำ:</strong> เวลาใช้งาน <strong>"แค่เอาไอดี กับ พาสที่สมัครลงทะเบียนไว้ ไปล็อกอิน"</strong> ในโปรแกรม POS หน้าร้านได้ทันที
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>

@@ -137,7 +137,42 @@ public class CrossDeviceActionLockoutAndAuditTests : IClassFixture<CustomWebAppl
     [Fact]
     public async Task AuditLogs_RecordsAllOrderLifecycleActionsWithSource()
     {
-        // Query audit logs
+        // 1. Ensure an order status transition exists in this test run
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var tenantService = scope.ServiceProvider.GetRequiredService<ITenantService>();
+            await tenantService.EnsureMasterAndDefaultTenantAsync();
+            var db = tenantService.CreateTenantDbContext("DEFAULT");
+            var product = db.Products.FirstOrDefault();
+            if (product == null)
+            {
+                product = new ProductEntity { Code = "TEST-M9", Name = "ผัดกะเพรา", Price = 80m, CategoryId = 1 };
+                db.Products.Add(product);
+                await db.SaveChangesAsync();
+            }
+
+            var orderReq = new CreateOrderRequest
+            {
+                Type = OrderType.DineIn,
+                TableNumber = "T4",
+                CustomerName = "ทดสอบออดิต",
+                CustomerPhone = "0812345678",
+                Items = new List<CreateOrderItemRequest>
+                {
+                    new CreateOrderItemRequest { ProductId = product.Id, Quantity = 1 }
+                }
+            };
+            var createRes = await _client.PostAsJsonAsync("/api/orders", orderReq);
+            var order = (await createRes.Content.ReadFromJsonAsync<ApiResponse<OrderDto>>())!.Data!;
+            await _client.PutAsJsonAsync($"/api/orders/{order.Id}/status", new UpdateOrderStatusRequest
+            {
+                Status = OrderStatus.Preparing,
+                Source = "WEB_KITCHEN",
+                UpdatedBy = "kitchen"
+            });
+        }
+
+        // 2. Query audit logs
         var res = await _client.GetAsync("/api/audit?limit=50");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
 

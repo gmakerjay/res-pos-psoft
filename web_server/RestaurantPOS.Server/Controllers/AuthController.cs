@@ -76,7 +76,7 @@ public class AuthController : ControllerBase
                         inputUsername.Equals(tenantInfo.StoreName, StringComparison.OrdinalIgnoreCase)
                     ));
 
-                if (isMatchingIdentifier || !string.IsNullOrWhiteSpace(request.StoreCode))
+                if (isMatchingIdentifier)
                 {
                     user = adminUser;
                     _logger.LogInformation("[Auth] Matched SuperAdmin for store {StoreCode} via identifier: {Identifier}", targetStoreCode, inputUsername);

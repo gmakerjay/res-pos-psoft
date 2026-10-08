@@ -192,6 +192,51 @@ public class ApiClient
         }
     }
 
+    public async Task<TableDto?> ReserveTableAsync(int id, ReserveTableRequest req)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"/api/tables/{id}/reserve", req);
+            var result = await res.Content.ReadFromJsonAsync<ApiResponse<TableDto>>(_jsonOptions);
+            return result?.Data;
+        }
+        catch (Exception ex)
+        {
+            PosLogger.Error($"[API] Failed to reserve table {id}: " + ex.Message, ex);
+            throw new Exception("ไม่สามารถบันทึกการจองโต๊ะได้: " + ex.Message, ex);
+        }
+    }
+
+    public async Task<TableDto?> CheckInTableAsync(int id)
+    {
+        try
+        {
+            var res = await _http.PostAsync($"/api/tables/{id}/check-in", null);
+            var result = await res.Content.ReadFromJsonAsync<ApiResponse<TableDto>>(_jsonOptions);
+            return result?.Data;
+        }
+        catch (Exception ex)
+        {
+            PosLogger.Error($"[API] Failed to check-in table {id}: " + ex.Message, ex);
+            throw new Exception("ไม่สามารถเช็คอินเข้าโต๊ะได้: " + ex.Message, ex);
+        }
+    }
+
+    public async Task<TableDto?> CancelTableReservationAsync(int id)
+    {
+        try
+        {
+            var res = await _http.PostAsync($"/api/tables/{id}/cancel-reservation", null);
+            var result = await res.Content.ReadFromJsonAsync<ApiResponse<TableDto>>(_jsonOptions);
+            return result?.Data;
+        }
+        catch (Exception ex)
+        {
+            PosLogger.Error($"[API] Failed to cancel reservation for table {id}: " + ex.Message, ex);
+            throw new Exception("ไม่สามารถยกเลิกการจองโต๊ะได้: " + ex.Message, ex);
+        }
+    }
+
 
     public async Task<List<CategoryDto>> GetCategoriesAsync()
     {
@@ -334,7 +379,7 @@ public class ApiClient
     {
         try
         {
-            var dateStr = (date ?? DateTime.UtcNow).ToString("yyyy-MM-dd");
+            var dateStr = (date ?? DateTime.Today).ToString("yyyy-MM-dd");
             var res = await _http.GetFromJsonAsync<ApiResponse<DailyReportSummaryDto>>($"/api/reports/daily?date={dateStr}", _jsonOptions);
             return res?.Data;
         }
@@ -612,5 +657,21 @@ public class ApiClient
             return new List<AuditLogDto>();
         }
     }
+
+    public async Task<string> ExportStoreBackupRawJsonAsync()
+    {
+        try
+        {
+            var res = await _http.GetAsync("/api/backup/export");
+            res.EnsureSuccessStatusCode();
+            return await res.Content.ReadAsStringAsync();
+        }
+        catch (Exception ex)
+        {
+            PosLogger.Error("[Backup] Failed to export backup: " + ex.Message, ex);
+            throw;
+        }
+    }
 }
+
 

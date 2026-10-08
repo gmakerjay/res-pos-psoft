@@ -16,5 +16,6 @@ public interface ITenantService
     Task<TenantDto?> SetTenantActiveStatusAsync(string storeCode, bool isActive);
     GenerateKeyResponse GenerateActivationKey(string storeCode, string plan);
     string GenerateSecureStoreCode();
-
+    Task<int> ResetAllStoresExceptDefaultAsync();
 }
+
