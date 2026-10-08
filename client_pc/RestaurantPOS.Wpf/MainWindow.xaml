@@ -3,25 +3,26 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Psoft-RES Online - ระบบร้านอาหารและจุดขาย POS (Online Client Edition)" 
         Icon="app.ico"
-        Height="860" Width="1440"
-        MinHeight="760" MinWidth="1280"
+        Height="700" Width="1180"
+        MinHeight="500" MinWidth="900"
+        WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         Background="#ECE9D8"
         FontFamily="Segoe UI, Tahoma"
-        FontSize="15">
+        FontSize="14">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
-        <!-- Tab Radio Style (Large, Touch-Friendly) -->
+        <!-- Tab Radio Style (Touch-Friendly & Responsive) -->
         <Style x:Key="TabRadioStyle" TargetType="RadioButton">
             <Setter Property="Background" Value="#D8D4C8"/>
             <Setter Property="BorderBrush" Value="#9E9A8E"/>
             <Setter Property="BorderThickness" Value="1,1,1,0"/>
-            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Padding" Value="11,5"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Margin" Value="0,0,3,0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -52,7 +53,7 @@
             <Setter Property="BorderBrush" Value="#7F9DB9"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -60,7 +61,7 @@
                         <Border x:Name="b" Background="{TemplateBinding Background}" 
                                 BorderBrush="{TemplateBinding BorderBrush}" 
                                 BorderThickness="{TemplateBinding BorderThickness}" 
-                                Padding="8,4">
+                                Padding="8,3">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -117,16 +118,16 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="54"/>   <!-- 0: Top App Header -->
+            <RowDefinition Height="46"/>   <!-- 0: Top App Header -->
             <RowDefinition Height="Auto"/> <!-- 1: Live Order Alert Banner -->
-            <RowDefinition Height="46"/>   <!-- 2: Main Navigation Tabs -->
+            <RowDefinition Height="40"/>   <!-- 2: Main Navigation Tabs -->
             <RowDefinition Height="*"/>    <!-- 3: Main Content Area -->
-            <RowDefinition Height="30"/>   <!-- 4: Bottom Status Bar -->
+            <RowDefinition Height="26"/>   <!-- 4: Bottom Status Bar -->
         </Grid.RowDefinitions>
 
         <!-- 0. Top App Header (Classic XP Theme with High Visibility) -->
         <Border Grid.Row="0" Background="#245EDC" BorderBrush="#163E9B" BorderThickness="0,0,0,2">
-            <Grid Margin="12,0">
+            <Grid Margin="10,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
@@ -134,39 +135,39 @@
 
                 <!-- Left Section: App Title, Store Badge & License Status -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="#1C4BB3" Padding="8,4" CornerRadius="4" Margin="0,0,8,0">
-                        <TextBlock Text="Psoft-RES Online" FontWeight="Bold" FontSize="15" Foreground="White" VerticalAlignment="Center"/>
+                    <Border Background="#1C4BB3" Padding="7,3" CornerRadius="4" Margin="0,0,8,0">
+                        <TextBlock Text="Psoft-RES Online" FontWeight="Bold" FontSize="14.5" Foreground="White" VerticalAlignment="Center"/>
                     </Border>
-                    <Border Background="#0D47A1" Padding="6,3" CornerRadius="4" VerticalAlignment="Center" Margin="0,0,8,0">
-                        <TextBlock x:Name="TxtStoreBadge" Text="[ร้าน: DEFAULT]" FontWeight="Bold" FontSize="12.5" Foreground="#FFEB3B" VerticalAlignment="Center"/>
+                    <Border Background="#0D47A1" Padding="6,2" CornerRadius="4" VerticalAlignment="Center" Margin="0,0,8,0">
+                        <TextBlock x:Name="TxtStoreBadge" Text="[ร้าน: DEFAULT]" FontWeight="Bold" FontSize="12" Foreground="#FFEB3B" VerticalAlignment="Center"/>
                     </Border>
                     <!-- License Status Badge (Clickable to open Activate License Dialog) -->
-                    <Border x:Name="BorderLicenseBadge" Background="#E65100" Padding="6,3" CornerRadius="4" VerticalAlignment="Center" Cursor="Hand" MouseDown="BorderLicenseBadge_MouseDown">
-                        <TextBlock x:Name="TxtLicenseBadge" Text="[ สิทธิ์: กำลังตรวจสอบ... ]" FontWeight="Bold" FontSize="12" Foreground="White" VerticalAlignment="Center"/>
+                    <Border x:Name="BorderLicenseBadge" Background="#E65100" Padding="6,2" CornerRadius="4" VerticalAlignment="Center" Cursor="Hand" MouseDown="BorderLicenseBadge_MouseDown">
+                        <TextBlock x:Name="TxtLicenseBadge" Text="[ สิทธิ์: กำลังตรวจสอบ... ]" FontWeight="Bold" FontSize="11.5" Foreground="White" VerticalAlignment="Center"/>
                     </Border>
                 </StackPanel>
 
                 <!-- Right Section: Cashier, Logout, Server Config, Connection & Clock -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <TextBlock x:Name="TxtCashier" Text="ผู้ใช้งาน: admin [SuperAdmin]" FontSize="13" FontWeight="SemiBold" Foreground="#E0EDFF" VerticalAlignment="Center"/>
-                    <Button x:Name="BtnLogout" Content="ออกจากระบบ" Height="28" Padding="10,0" Margin="8,0,10,0"
-                            Background="#D32F2F" Foreground="White" BorderBrush="#B71C1C" FontSize="12" FontWeight="Bold"
+                    <TextBlock x:Name="TxtCashier" Text="ผู้ใช้งาน: admin [SuperAdmin]" FontSize="12.5" FontWeight="SemiBold" Foreground="#E0EDFF" VerticalAlignment="Center"/>
+                    <Button x:Name="BtnLogout" Content="ออกจากระบบ" Height="26" Padding="8,0" Margin="8,0,10,0"
+                            Background="#D32F2F" Foreground="White" BorderBrush="#B71C1C" FontSize="11.5" FontWeight="Bold"
                             Click="BtnLogout_Click" Cursor="Hand"/>
 
                     <TextBlock Text="|" Foreground="#7FA5EB" Margin="0,0,10,0" VerticalAlignment="Center"/>
 
                     <!-- Server Config Button -->
-                    <Button x:Name="BtnServerConfig" Content="ตั้งค่าเซิร์ฟเวอร์..." Height="28" Padding="10,0"
-                            Background="#316AC5" Foreground="White" BorderBrush="#1C4BB3" FontWeight="Bold" FontSize="12"
+                    <Button x:Name="BtnServerConfig" Content="ตั้งค่าเซิร์ฟเวอร์..." Height="26" Padding="8,0"
+                            Background="#316AC5" Foreground="White" BorderBrush="#1C4BB3" FontWeight="Bold" FontSize="11.5"
                             Margin="0,0,10,0" Click="BtnServerConfig_Click" Cursor="Hand"/>
 
                     <!-- Realtime Connection Status Badge -->
-                    <Border x:Name="BadgeConnection" Background="#2E7D32" CornerRadius="10" Padding="10,4" Margin="0,0,10,0" VerticalAlignment="Center">
-                        <TextBlock x:Name="TxtConnection" Text="เชื่อมต่อเซิร์ฟเวอร์เรียบร้อย" FontSize="11.5" FontWeight="Bold" Foreground="White"/>
+                    <Border x:Name="BadgeConnection" Background="#2E7D32" CornerRadius="10" Padding="8,3" Margin="0,0,10,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtConnection" Text="เชื่อมต่อเซิร์ฟเวอร์เรียบร้อย" FontSize="11" FontWeight="Bold" Foreground="White"/>
                     </Border>
 
                     <!-- Clock -->
-                    <TextBlock x:Name="TxtClock" Text="2026-10-07 14:00:00" FontFamily="Consolas" FontSize="13.5" 
+                    <TextBlock x:Name="TxtClock" Text="2026-10-07 14:00:00" FontFamily="Consolas" FontSize="13" 
                                FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                 </StackPanel>
             </Grid>
@@ -174,65 +175,75 @@
 
         <!-- 1. Live Order Alert Banner (Shows when customer orders online) -->
         <Border x:Name="BorderAlert" Grid.Row="1" Background="#EF6C00" BorderBrush="#E65100" BorderThickness="0,0,0,1" 
-                Padding="16,8" Visibility="Collapsed">
+                Padding="12,6" Visibility="Collapsed">
             <DockPanel LastChildFill="True">
-                <Button x:Name="BtnAlertAcceptOrder" Content="[ รับออเดอร์ทันที ]" DockPanel.Dock="Right" Height="30" Padding="14,2" Margin="0,0,8,0"
-                        Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20" FontWeight="Bold" FontSize="13"
+                <Button x:Name="BtnAlertAcceptOrder" Content="[ รับออเดอร์ทันที ]" DockPanel.Dock="Right" Height="28" Padding="12,2" Margin="0,0,6,0"
+                        Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20" FontWeight="Bold" FontSize="12.5"
                         Click="BtnAlertAcceptOrder_Click" Cursor="Hand"/>
-                <Button Content="ดูรายการออเดอร์ (F2)" DockPanel.Dock="Right" Height="30" Padding="14,2" Margin="0,0,8,0" 
-                        Background="#FFF" Foreground="#E65100" BorderBrush="#B23C00" FontWeight="Bold" FontSize="13"
+                <Button Content="ดูรายการออเดอร์ (F2)" DockPanel.Dock="Right" Height="28" Padding="12,2" Margin="0,0,6,0" 
+                        Background="#FFF" Foreground="#E65100" BorderBrush="#B23C00" FontWeight="Bold" FontSize="12.5"
                         Click="BtnAlertViewOrders_Click" Cursor="Hand"/>
-                <Button x:Name="BtnAlertDismiss" Content="[X] พักเสียงเตือน" DockPanel.Dock="Right" Height="30" Padding="10,2" Margin="0,0,10,0"
-                        Background="#D84315" Foreground="White" BorderBrush="#BF360C" FontSize="12" FontWeight="Bold"
+                <Button x:Name="BtnAlertDismiss" Content="[X] พักเสียงเตือน" DockPanel.Dock="Right" Height="28" Padding="8,2" Margin="0,0,8,0"
+                        Background="#D84315" Foreground="White" BorderBrush="#BF360C" FontSize="11.5" FontWeight="Bold"
                         Click="BtnAlertDismiss_Click" Cursor="Hand"/>
                 <TextBlock x:Name="TxtAlertMessage" Text="[มีออเดอร์ใหม่จากลูกค้า] กำลังรอคิว..." 
-                           VerticalAlignment="Center" FontWeight="Bold" Foreground="White" FontSize="14.5"/>
+                           VerticalAlignment="Center" FontWeight="Bold" Foreground="White" FontSize="13.5" TextTrimming="CharacterEllipsis"/>
             </DockPanel>
         </Border>
 
-        <!-- 2. Main Navigation Tabs (Large Touch-Friendly Font) -->
-        <Border Grid.Row="2" Background="#D8D4C8" BorderBrush="#9E9A8E" BorderThickness="0,0,0,1" Padding="12,3,12,0">
-            <DockPanel LastChildFill="False">
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                    <RadioButton x:Name="TabPos" Content=" [ F1 ] หน้าขายแคชเชียร์ (POS) " IsChecked="True" 
-                                 Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
-                    <RadioButton x:Name="TabOrders" Content=" [ F2 ] ออเดอร์ลูกค้า &amp; ห้องครัว " 
-                                 Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
-                    <RadioButton x:Name="TabMenu" Content=" [ F3 ] จัดการรายการอาหาร &amp; หมวดหมู่ " 
-                                 Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
-                    <RadioButton x:Name="TabStock" Content=" [ F4 ] สต๊อกวัตถุดิบ (Raw Materials) " 
-                                 Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
-                    <RadioButton x:Name="TabReports" Content=" [ F5 ] สรุปรายงานยอดขาย " 
-                                 Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
-                    <RadioButton x:Name="TabSettings" Content=" [ F6 ] ตั้งค่าระบบ &amp; เสียงเตือน " 
-                                 Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
-                </StackPanel>
+        <!-- 2. Main Navigation Tabs (Scrollable & Responsive) -->
+        <Border Grid.Row="2" Background="#D8D4C8" BorderBrush="#9E9A8E" BorderThickness="0,0,0,1" Padding="8,2,8,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Scrollable Navigation Tabs -->
+                <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="TabPos" Content=" [ F1 ] ขายหน้าร้าน (POS) " IsChecked="True" 
+                                     Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
+                        <RadioButton x:Name="TabOrders" Content=" [ F2 ] ออเดอร์ &amp; ครัว " 
+                                     Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
+                        <RadioButton x:Name="TabMenu" Content=" [ F3 ] เมนูอาหาร " 
+                                     Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
+                        <RadioButton x:Name="TabStock" Content=" [ F4 ] สต๊อกวัตถุดิบ " 
+                                     Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
+                        <RadioButton x:Name="TabReports" Content=" [ F5 ] สรุปยอดขาย " 
+                                     Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
+                        <RadioButton x:Name="TabSettings" Content=" [ F6 ] ตั้งค่าระบบ " 
+                                     Style="{DynamicResource TabRadioStyle}" Checked="Tab_Changed"/>
+                    </StackPanel>
+                </ScrollViewer>
                 
-                <Button x:Name="BtnActivateLicense" DockPanel.Dock="Right" 
-                        Content="[ เปิดใช้งานสิทธิ์ Key ]" 
-                        Padding="10,4" Margin="0,0,8,3" Height="28"
-                        Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20"
-                        FontWeight="Bold" FontSize="11.5" Cursor="Hand"
-                        Click="BtnActivateLicense_Click"/>
+                <!-- Quick Utility Buttons (Right Side) -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,2">
+                    <Button x:Name="BtnActivateLicense" 
+                            Content="[ ใส่คีย์ Key ]" 
+                            Padding="8,3" Margin="0,0,6,0" Height="26"
+                            Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20"
+                            FontWeight="Bold" FontSize="11" Cursor="Hand"
+                            Click="BtnActivateLicense_Click"/>
 
-                <Button x:Name="BtnOpenTableQr" DockPanel.Dock="Right" 
-                        Content="[ จัดการ &amp; พิมพ์ QR Code โต๊ะ ]" 
-                        Padding="12,4" Margin="0,0,0,3" Height="28"
-                        Background="#0D47A1" Foreground="White" BorderBrush="#002171"
-                        FontWeight="Bold" FontSize="11.5" Cursor="Hand"
-                        Click="BtnOpenTableQr_Click"/>
-            </DockPanel>
+                    <Button x:Name="BtnOpenTableQr" 
+                            Content="[ QR โต๊ะ ]" 
+                            Padding="8,3" Margin="0,0,0,0" Height="26"
+                            Background="#0D47A1" Foreground="White" BorderBrush="#002171"
+                            FontWeight="Bold" FontSize="11" Cursor="Hand"
+                            Click="BtnOpenTableQr_Click"/>
+                </StackPanel>
+            </Grid>
         </Border>
-
 
         <!-- 3. Main Content Area -->
-        <Grid Grid.Row="3" Margin="10">
+        <Grid Grid.Row="3" Margin="8">
 
             <!-- TAB 1: POS SALES (Decoupled from Tables - No Table Locking!) -->
             <Grid x:Name="ViewPos" Visibility="Visible">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>   <!-- Product Menu & Category Filter -->
-                    <ColumnDefinition Width="480"/> <!-- Current Order Tray / Cart -->
+                    <ColumnDefinition Width="420"/> <!-- Current Order Tray / Cart -->
                 </Grid.ColumnDefinitions>
 
                 <!-- LEFT/CENTER: Product Catalog -->
