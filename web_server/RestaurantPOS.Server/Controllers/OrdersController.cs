@@ -145,10 +145,27 @@ public class OrdersController : ControllerBase
             });
         }
 
-        // 3. Generate Order Number: ORD-yyyyMMdd-XXXX
+        // 3. Generate Order Number: ORD-yyyyMMdd-XXXX (Concurrency-safe)
         var todayStr = DateTime.UtcNow.ToString("yyyyMMdd");
-        var todayCount = await _db.Orders.CountAsync(o => o.CreatedAt.Date == DateTime.UtcNow.Date);
-        var orderNumber = $"ORD-{todayStr}-{(todayCount + 1):D4}";
+        var prefix = $"ORD-{todayStr}-";
+
+        var latestOrderNumber = await _db.Orders
+            .Where(o => o.OrderNumber.StartsWith(prefix))
+            .OrderByDescending(o => o.OrderNumber)
+            .Select(o => o.OrderNumber)
+            .FirstOrDefaultAsync();
+
+        int nextSeq = 1;
+        if (!string.IsNullOrEmpty(latestOrderNumber) && latestOrderNumber.Length >= prefix.Length)
+        {
+            var numPart = latestOrderNumber.Substring(prefix.Length);
+            if (int.TryParse(numPart, out var lastVal))
+            {
+                nextSeq = lastVal + 1;
+            }
+        }
+
+        var orderNumber = $"{prefix}{nextSeq:D4}";
 
         var order = new OrderEntity
         {
@@ -170,7 +187,27 @@ public class OrdersController : ControllerBase
 
         _db.Orders.Add(order);
 
-        await _db.SaveChangesAsync();
+        // Safe retry loop in case of concurrent insert race condition
+        var saved = false;
+        var retryCount = 0;
+        while (!saved && retryCount < 10)
+        {
+            try
+            {
+                await _db.SaveChangesAsync();
+                saved = true;
+            }
+            catch (DbUpdateException duex) when (duex.InnerException?.Message.Contains("Orders.OrderNumber") == true || 
+                                                duex.Message.Contains("Orders.OrderNumber") ||
+                                                duex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
+            {
+                retryCount++;
+                nextSeq++;
+                order.OrderNumber = $"{prefix}{nextSeq:D4}";
+                _logger.LogWarning("[Order] Concurrency collision on OrderNumber. Retrying with {NewOrderNumber} (Attempt {Attempt})", 
+                    order.OrderNumber, retryCount);
+            }
+        }
 
         var dto = MapToDto(order);
 
@@ -251,11 +288,56 @@ public class OrdersController : ControllerBase
 
         var dto = MapToDto(order);
 
-        // Broadcast status change to POS and Web clients (tenant-scoped)
-        await _notifier.BroadcastAsync(HubEvents.OrderStatusChanged, dto);
+        var operatorName = !string.IsNullOrWhiteSpace(req.UpdatedBy) ? req.UpdatedBy : (User.Identity?.Name ?? "พนักงาน");
+        var sourceName = !string.IsNullOrWhiteSpace(req.Source) ? req.Source : "POS";
+        var newBadge = req.Status switch
+        {
+            OrderStatus.New => "[ออเดอร์ใหม่]",
+            OrderStatus.Accepted => "[รับออเดอร์แล้ว]",
+            OrderStatus.Preparing => "[กำลังปรุง]",
+            OrderStatus.Ready => "[ปรุงเสร็จแล้ว]",
+            OrderStatus.Completed => "[เสร็จสิ้น]",
+            OrderStatus.Cancelled => "[ยกเลิก]",
+            _ => req.Status.ToString()
+        };
 
-        _logger.LogInformation("[Order] Order {OrderNumber} status changed from {Old} to {New}", 
-            order.OrderNumber, oldStatus, req.Status);
+        var actionActivity = new OrderActionActivityDto
+        {
+            OrderId = order.Id,
+            OrderNumber = order.OrderNumber,
+            TableDisplay = dto.TableDisplay,
+            PreviousStatus = oldStatus,
+            NewStatus = req.Status,
+            Source = sourceName,
+            OperatorName = operatorName,
+            ActionDescription = $"[{sourceName}-{operatorName}] ปรับสถานะออเดอร์ {order.OrderNumber} ({dto.TableDisplay}) เป็น {newBadge}",
+            Timestamp = DateTime.UtcNow
+        };
+
+        // Broadcast status change and detailed action activity to POS and Web clients (tenant-scoped)
+        await _notifier.BroadcastAsync(HubEvents.OrderStatusChanged, dto);
+        await _notifier.BroadcastAsync(HubEvents.OrderActionActivity, actionActivity);
+
+        try
+        {
+            _db.AuditLogs.Add(new AuditLogEntity
+            {
+                Action = "ORDER_STATUS_CHANGED",
+                EntityName = "Order",
+                EntityId = order.Id.ToString(),
+                Username = $"{sourceName}:{operatorName}",
+                Details = actionActivity.ActionDescription,
+                Timestamp = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync();
+        }
+        catch (Exception aex)
+        {
+            _logger.LogWarning(aex, "[Order] Failed to save audit log for order status change");
+        }
+
+        _logger.LogInformation("[Order] Order {OrderNumber} status changed from {Old} to {New} by {Operator} ({Source})", 
+            order.OrderNumber, oldStatus, req.Status, operatorName, sourceName);
 
         return Ok(ApiResponse<OrderDto>.Ok(dto));
     }

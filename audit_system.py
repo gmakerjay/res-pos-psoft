@@ -181,13 +181,19 @@ check("Developer Stores List with Valid Dev Key Header", s_dev_auth == 200 and l
 
 # 8. Client Binaries Verification
 base_dir = r"c:\Users\admin\Documents\res-pos_psoft"
-client_exe = os.path.join(base_dir, "build_output", "client_pc", "RestaurantPOS.Wpf.exe")
-client_release_exe = os.path.join(base_dir, "Client_POS_Release", "RestaurantPOS.Wpf.exe")
+client_exe = os.path.join(base_dir, "build_output", "client_pc", "Psoft-RES Online.exe")
+if not os.path.isfile(client_exe):
+    client_exe = os.path.join(base_dir, "build_output", "client_pc", "RestaurantPOS.Wpf.exe")
+
+client_release_exe = os.path.join(base_dir, "Client_POS_Release", "Psoft-RES Online.exe")
+if not os.path.isfile(client_release_exe):
+    client_release_exe = os.path.join(base_dir, "Client_POS_Release", "RestaurantPOS.Wpf.exe")
+
 server_dll = os.path.join(base_dir, "build_output", "web_server", "RestaurantPOS.Server.dll")
 
-check("Desktop POS Release EXE in build_output/client_pc", os.path.isfile(client_exe), f"Size: {os.path.getsize(client_exe):,} bytes")
-check("Desktop POS Release EXE in Client_POS_Release", os.path.isfile(client_release_exe), f"Size: {os.path.getsize(client_release_exe):,} bytes")
-check("Server DLL in build_output/web_server", os.path.isfile(server_dll), f"Size: {os.path.getsize(server_dll):,} bytes")
+check("Desktop POS Release EXE in build_output/client_pc", os.path.isfile(client_exe), f"Size: {os.path.getsize(client_exe):,} bytes" if os.path.isfile(client_exe) else "Not found")
+check("Desktop POS Release EXE in Client_POS_Release", os.path.isfile(client_release_exe), f"Size: {os.path.getsize(client_release_exe):,} bytes" if os.path.isfile(client_release_exe) else "Not found")
+check("Server DLL in build_output/web_server", os.path.isfile(server_dll), f"Size: {os.path.getsize(server_dll):,} bytes" if os.path.isfile(server_dll) else "Not found")
 
 # 9. Strict Rule: Check NO Prohibited Emojis in Source Code (UI/Views)
 emoji_pattern = re.compile(r'[\U00010000-\U0010ffff]', flags=re.UNICODE)

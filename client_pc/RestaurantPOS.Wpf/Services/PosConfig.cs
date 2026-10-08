@@ -25,6 +25,10 @@ public class PosConfig
     // Sound & Audio Alerts
     public bool SoundEnabled { get; set; } = true;
     public int SoundVolume { get; set; } = 90; // 0 - 100%
+    public bool RepeatAlertForUnacceptedOrders { get; set; } = true;
+    public int UnacceptedAlertIntervalSeconds { get; set; } = 30; // repeat every 30s
+    public bool EscalateAlertVolumeAndPitch { get; set; } = true; // escalate volume & frequency
+
 
     // Store Info & Tax
     public string StoreName { get; set; } = "ร้านอาหาร Restaurant POS";
@@ -36,6 +40,12 @@ public class PosConfig
     public decimal VatPercent { get; set; } = 7.0m;
     public decimal ServiceChargePercent { get; set; } = 0.0m;
     public int LowStockThreshold { get; set; } = 5;
+
+    // Advanced Sync & Workflow
+    public bool ShowActivityNotifications { get; set; } = true;
+    public bool ConfirmStatusChange { get; set; } = false;
+    public bool AutoPrintKitchenOnPreparing { get; set; } = true;
+    public int OrderAutoRefreshSeconds { get; set; } = 0; // 0 = Realtime SignalR only
 
     public string GetBaseUrl()
     {

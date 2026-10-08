@@ -17,6 +17,7 @@ public class RealtimeClient : IAsyncDisposable
     public event Action<ProductDto>? MenuUpdated;
     public event Action<CategoryDto>? CategoryUpdated;
     public event Action<IngredientDto>? IngredientUpdated;
+    public event Action<OrderActionActivityDto>? OrderActionActivityReceived;
 
     public bool IsConnected => _hub?.State == HubConnectionState.Connected;
 
@@ -119,6 +120,12 @@ public class RealtimeClient : IAsyncDisposable
                 IngredientUpdated?.Invoke(ingredient);
             });
 
+            _hub.On<OrderActionActivityDto>(HubEvents.OrderActionActivity, activity =>
+            {
+                PosLogger.Info($"[SignalR Event] Order Action Activity: {activity.ActionDescription}");
+                OrderActionActivityReceived?.Invoke(activity);
+            });
+
             await _hub.StartAsync();
             PosLogger.Info("[SignalR] Realtime client connected successfully to " + _hubUrl);
 
@@ -138,6 +145,21 @@ public class RealtimeClient : IAsyncDisposable
         {
             PosLogger.Error("[SignalR] Failed to connect to realtime hub: " + ex.Message, ex);
             ConnectionStatusChanged?.Invoke(false, "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+        }
+    }
+
+    public async Task SendOrderActionAsync(OrderActionActivityDto action)
+    {
+        if (_hub != null && _hub.State == HubConnectionState.Connected)
+        {
+            try
+            {
+                await _hub.InvokeAsync(HubEvents.NotifyOrderAction, action);
+            }
+            catch (Exception ex)
+            {
+                PosLogger.Warn($"[SignalR] Failed to send order action notification: {ex.Message}");
+            }
         }
     }
 

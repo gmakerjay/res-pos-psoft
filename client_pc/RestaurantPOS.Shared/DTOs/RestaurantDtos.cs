@@ -12,6 +12,15 @@ public class TableDto
     public int? CurrentOrderId { get; set; }
     public decimal CurrentBillAmount { get; set; }
     public DateTime? SeatedAt { get; set; }
+
+    public string StatusBadge => Status switch
+    {
+        TableStatus.Available => "[ว่าง]",
+        TableStatus.Occupied => "[มีลูกค้า]",
+        TableStatus.Reserved => "[จอง]",
+        TableStatus.Billing => "[รอชำระเงิน]",
+        _ => Status.ToString()
+    };
 }
 
 public class CreateTableDto
@@ -157,6 +166,24 @@ public class OrderDto
         OrderStatus.Cancelled => "[ยกเลิก]",
         _ => Status.ToString()
     };
+
+    public bool CanAccept => Status == OrderStatus.New;
+    public bool CanPrepare => Status == OrderStatus.Accepted;
+    public bool CanReady => Status == OrderStatus.Preparing;
+    public bool CanComplete => Status == OrderStatus.Ready;
+    public bool CanCancel => Status != OrderStatus.Completed && Status != OrderStatus.Cancelled;
+    public bool IsActive => Status != OrderStatus.Completed && Status != OrderStatus.Cancelled;
+
+    public string StatusColorHex => Status switch
+    {
+        OrderStatus.New => "#DC2626",
+        OrderStatus.Accepted => "#1D4ED8",
+        OrderStatus.Preparing => "#D97706",
+        OrderStatus.Ready => "#EA580C",
+        OrderStatus.Completed => "#16A34A",
+        OrderStatus.Cancelled => "#64748B",
+        _ => "#334155"
+    };
 }
 
 public class CreateOrderItemRequest
@@ -183,6 +210,21 @@ public class UpdateOrderStatusRequest
 {
     public OrderStatus Status { get; set; }
     public string? Reason { get; set; }
+    public string? UpdatedBy { get; set; }
+    public string? Source { get; set; } // "POS" | "WEB_KITCHEN" | "WEB_MANAGE"
+}
+
+public class OrderActionActivityDto
+{
+    public int OrderId { get; set; }
+    public string OrderNumber { get; set; } = string.Empty;
+    public string? TableDisplay { get; set; }
+    public OrderStatus PreviousStatus { get; set; }
+    public OrderStatus NewStatus { get; set; }
+    public string Source { get; set; } = "POS";
+    public string OperatorName { get; set; } = string.Empty;
+    public string ActionDescription { get; set; } = string.Empty;
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 }
 
 public class PaymentRequest
@@ -207,6 +249,7 @@ public class LoginRequest
 {
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+    public string? StoreCode { get; set; }
 }
 
 public class LoginResponse
@@ -252,6 +295,7 @@ public class AuditLogDto
     public string Username { get; set; } = string.Empty;
     public string Details { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; }
+    public DateTime LocalTimestamp => Timestamp.ToLocalTime();
 }
 
 public class CategoryCreateOrUpdateRequest

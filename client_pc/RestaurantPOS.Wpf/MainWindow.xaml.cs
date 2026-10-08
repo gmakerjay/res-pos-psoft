@@ -30,6 +30,16 @@ public partial class MainWindow : Window
     private ObservableCollection<OrderItemDto> _cartItems = new();
     private List<OrderDto> _liveOrders = new();
     private List<OrderDto> _currentTableOrders = new();
+    private List<TableDto> _tablesList = new();
+    private readonly HashSet<int> _processingOrderIds = new();
+    private DispatcherTimer? _activityBannerTimer;
+    private DispatcherTimer? _autoRefreshTimer;
+
+    // Unaccepted orders repeating alert tracking (+30s cycles with escalating volume & pitch)
+    private DateTime? _unacceptedTrackingStartTime;
+    private DateTime _lastUnacceptedAlertTime = DateTime.MinValue;
+    private int _currentEscalationRound = 0;
+    private bool _snoozeBannerUntilNextCycle = false;
 
     private OrderType _orderType = OrderType.DineIn;
     private int? _selectedCategoryId = null;
@@ -50,9 +60,13 @@ public partial class MainWindow : Window
 
         GridCartItems.ItemsSource = _cartItems;
 
-        // Clock timer
+        // Clock & unaccepted orders recurring reminder timer
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _clockTimer.Tick += (s, e) => TxtClock.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        _clockTimer.Tick += (s, e) =>
+        {
+            TxtClock.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            CheckUnacceptedOrdersReminder();
+        };
         _clockTimer.Start();
 
         Loaded += MainWindow_Loaded;
@@ -63,27 +77,48 @@ public partial class MainWindow : Window
         LoadPrinters();
         LoadStoreSettings();
         LoadSoundSettings();
-        SetupRealtime();
+        LoadAdvancedSettings();
 
-        // Enforce user authentication
+        // Enforce user authentication first
         if (!PromptLogin())
         {
             Application.Current.Shutdown();
             return;
         }
 
+        // Once authenticated, sync connection and start realtime client for this store
+        _config = PosConfig.Load();
+        _api.UpdateConnection(_config.GetBaseUrl(), _config.StoreCode);
+
+        if (_realtime != null)
+        {
+            await _realtime.DisposeAsync();
+        }
+        _realtime = new RealtimeClient(_config.GetBaseUrl(), _config.StoreCode);
+        SetupRealtime();
         await InitializeSystemAsync();
+
+        var startupLic = ClientLicenseService.Instance.GetCurrentLicenseStatus();
+        UpdateLicenseBadge(_currentStoreInfo);
+        if (startupLic.IsExpired || startupLic.IsTampered)
+        {
+            OpenActivateLicenseDialog();
+        }
     }
 
     private bool PromptLogin()
     {
+        _config = PosConfig.Load();
+        _api.UpdateConnection(_config.GetBaseUrl(), _config.StoreCode);
         var loginWin = new LoginWindow(_api, _config) { Owner = this };
         var result = loginWin.ShowDialog();
         if (result == true && loginWin.AuthenticatedUser != null)
         {
             _currentUser = loginWin.AuthenticatedUser;
+            _config = PosConfig.Load();
+            _api.UpdateConnection(_config.GetBaseUrl(), _config.StoreCode);
             TxtCashier.Text = $"ผู้ใช้งาน: {_currentUser.Username} [{_currentUser.Role}]";
-            PosLogger.Info($"[POS] Current user set to {_currentUser.Username}");
+            PosLogger.Info($"[POS] Current user set to {_currentUser.Username} (Store: {_config.StoreCode})");
             return true;
         }
         return false;
@@ -149,6 +184,8 @@ public partial class MainWindow : Window
     private void LoadSoundSettings()
     {
         ChkSoundEnabled.IsChecked = _config.SoundEnabled;
+        ChkRepeatAlert.IsChecked = _config.RepeatAlertForUnacceptedOrders;
+        ChkEscalateSound.IsChecked = _config.EscalateAlertVolumeAndPitch;
         SliderSoundVolume.Value = _config.SoundVolume;
         TxtSoundVolumeLabel.Text = $"{_config.SoundVolume}%";
     }
@@ -169,14 +206,21 @@ public partial class MainWindow : Window
         {
             Dispatcher.Invoke(() =>
             {
+                _unacceptedTrackingStartTime = DateTime.UtcNow;
+                _lastUnacceptedAlertTime = DateTime.UtcNow;
+                _currentEscalationRound = 1;
+                _snoozeBannerUntilNextCycle = false;
+
                 // Play loud audio alert if sound is enabled
                 if (_config.SoundEnabled)
                 {
-                    AudioAlertService.PlayOrderAlert(_config.SoundVolume);
+                    AudioAlertService.PlayEscalatingOrderAlert(1, _config.SoundVolume, _config.EscalateAlertVolumeAndPitch);
                 }
 
                 // Show alert banner
-                TxtAlertMessage.Text = $"[ออเดอร์ใหม่] บิล #{order.OrderNumber} ({order.TableNumber}) ยอด {order.TotalAmount:N2} บ.";
+                TxtAlertMessage.Text = $"[ออเดอร์ใหม่] บิล #{order.OrderNumber} ({order.TableNumber}) ยอด {order.TotalAmount:N2} บ. - กรุณากดรับออเดอร์";
+                BtnAlertAcceptOrder.Tag = order.Id;
+                BorderAlert.Background = new SolidColorBrush(Color.FromRgb(239, 108, 0));
                 BorderAlert.Visibility = Visibility.Visible;
 
                 // Print kitchen slip if auto-print enabled
@@ -226,6 +270,15 @@ public partial class MainWindow : Window
             Dispatcher.Invoke(() =>
             {
                 _ = RefreshLiveOrdersAsync();
+                _ = LoadTablesSettingsAsync();
+            });
+        };
+
+        _realtime.OrderActionActivityReceived += activity =>
+        {
+            Dispatcher.Invoke(() =>
+            {
+                OnOrderActionActivityReceived(activity);
             });
         };
 
@@ -239,6 +292,30 @@ public partial class MainWindow : Window
         };
 
         _ = _realtime.StartAsync();
+    }
+
+    private void OnOrderActionActivityReceived(OrderActionActivityDto activity)
+    {
+        if (_config.ShowActivityNotifications)
+        {
+            TxtLiveActivityMessage.Text = $"[{activity.Timestamp.ToLocalTime():HH:mm:ss}] {activity.ActionDescription}";
+            BorderLiveActivity.Visibility = Visibility.Visible;
+
+            _activityBannerTimer?.Stop();
+            _activityBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+            _activityBannerTimer.Tick += (s, e) =>
+            {
+                BorderLiveActivity.Visibility = Visibility.Collapsed;
+                _activityBannerTimer?.Stop();
+            };
+            _activityBannerTimer.Start();
+        }
+    }
+
+    private void BtnHideLiveActivity_Click(object sender, RoutedEventArgs e)
+    {
+        _activityBannerTimer?.Stop();
+        BorderLiveActivity.Visibility = Visibility.Collapsed;
     }
 
     private StoreInfoResponse? _currentStoreInfo;
@@ -285,35 +362,32 @@ public partial class MainWindow : Window
     private void UpdateLicenseBadge(StoreInfoResponse? storeInfo)
     {
         _currentStoreInfo = storeInfo;
-        if (storeInfo == null)
-        {
-            TxtLicenseBadge.Text = "[ สิทธิ์: ออฟไลน์ ]";
-            BorderLicenseBadge.Background = new SolidColorBrush(Color.FromRgb(117, 117, 117));
-            return;
-        }
+        var clientLic = ClientLicenseService.Instance.GetCurrentLicenseStatus();
 
-        if (storeInfo.SubscriptionPlan == "FullLifetime" || storeInfo.SubscriptionPlan == "Enterprise")
+        if (clientLic.IsPermanentLifetime)
         {
             TxtLicenseBadge.Text = "[ เวอร์ชันเต็ม ตลอดชีพ ]";
             BorderLicenseBadge.Background = new SolidColorBrush(Color.FromRgb(46, 125, 50));
         }
-        else if (storeInfo.SubscriptionPlan == "FullYearly")
+        else if (clientLic.IsValid && !clientLic.IsTrial)
         {
-            TxtLicenseBadge.Text = $"[ เวอร์ชันเต็ม เหลือ {storeInfo.DaysRemaining} วัน ]";
+            TxtLicenseBadge.Text = $"[ เวอร์ชันเต็ม เหลือ {clientLic.DaysRemaining} วัน ]";
             BorderLicenseBadge.Background = new SolidColorBrush(Color.FromRgb(2, 119, 189));
+        }
+        else if (clientLic.IsTampered)
+        {
+            TxtLicenseBadge.Text = "[ ตรวจพบการปรับเวลา (คลิกเพื่อปลดล็อก) ]";
+            BorderLicenseBadge.Background = new SolidColorBrush(Color.FromRgb(198, 40, 40));
+        }
+        else if (clientLic.IsExpired)
+        {
+            TxtLicenseBadge.Text = "[ สิทธิ์ทดลองใช้งาน 14 วันหมดอายุ (คลิกเพื่อใส่คีย์) ]";
+            BorderLicenseBadge.Background = new SolidColorBrush(Color.FromRgb(198, 40, 40));
         }
         else
         {
-            if (storeInfo.IsExpired)
-            {
-                TxtLicenseBadge.Text = "[ สิทธิ์ทดลองใช้งานหมดอายุ (คลิกเพื่อต่อสิทธิ์) ]";
-                BorderLicenseBadge.Background = new SolidColorBrush(Color.FromRgb(198, 40, 40));
-            }
-            else
-            {
-                TxtLicenseBadge.Text = $"[ ทดลองใช้: เหลืออีก {storeInfo.DaysRemaining} วัน ]";
-                BorderLicenseBadge.Background = new SolidColorBrush(Color.FromRgb(230, 81, 0));
-            }
+            TxtLicenseBadge.Text = $"[ ทดลองใช้: เหลืออีก {clientLic.DaysRemaining} วัน ]";
+            BorderLicenseBadge.Background = new SolidColorBrush(Color.FromRgb(230, 81, 0));
         }
     }
 
@@ -333,26 +407,31 @@ public partial class MainWindow : Window
         {
             Owner = this
         };
-        if (dlg.ShowDialog() == true && dlg.UpdatedStoreInfo != null)
-        {
-            UpdateLicenseBadge(dlg.UpdatedStoreInfo);
-        }
+        dlg.ShowDialog();
+        UpdateLicenseBadge(_currentStoreInfo);
     }
 
     private bool CheckLicenseValidOrPrompt()
     {
-        if (_currentStoreInfo != null && _currentStoreInfo.IsExpired)
+        var clientLic = ClientLicenseService.Instance.GetCurrentLicenseStatus();
+        if (clientLic.IsExpired || clientLic.IsTampered || !clientLic.IsValid)
         {
+            var msg = clientLic.IsTampered
+                ? "ตรวจพบการปรับเปลี่ยนเวลาของระบบเพื่อยืดอายุสิทธิ์\n\nกรุณากรอกรหัสเปิดใช้งาน (Activation Key) ที่ถูกต้องจากผู้พัฒนาเพื่อปลดล็อกการใช้งาน"
+                : $"สิทธิ์การทดลองใช้งาน 14 วันของเครื่องนี้หมดอายุแล้ว (ครบกำหนด 14 วันจริงนับจากวันแรกที่ติดตั้ง)\n\nรหัสประจำเครื่องนี้: {clientLic.MachineCode}\n\nกรุณาส่งรหัสเครื่องด้านบนให้ผู้พัฒนาเพื่อขอรหัสเปิดใช้งาน (Activation Key) ก่อนดำเนินการขายอาหารต่อ";
+
             MessageBox.Show(
                 this,
-                $"สิทธิ์การทดลองใช้งาน 14 วันของร้าน {_config.StoreCode} หมดอายุแล้ว\n\nกรุณากรอกรหัสเปิดใช้งาน (Activation Key) เพื่อดำเนินการขายอาหารและออกใบเสร็จต่อ",
+                msg,
                 "สิทธิ์การใช้งานหมดอายุ",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
 
             OpenActivateLicenseDialog();
-            return _currentStoreInfo != null && !_currentStoreInfo.IsExpired;
+            var recheck = ClientLicenseService.Instance.GetCurrentLicenseStatus();
+            return recheck.IsValid && !recheck.IsExpired;
         }
+
         return true;
     }
 
@@ -399,6 +478,9 @@ public partial class MainWindow : Window
         else if (TabSettings.IsChecked == true)
         {
             ViewSettings.Visibility = Visibility.Visible;
+            _ = LoadTablesSettingsAsync();
+            _ = LoadAuditLogsAsync();
+            LoadAdvancedSettings();
         }
     }
 
@@ -693,13 +775,8 @@ public partial class MainWindow : Window
             _products = await _api.GetProductsAsync();
 
             var baseUrl = _config.GetBaseUrl().TrimEnd('/');
-            foreach (var p in _products)
-            {
-                if (!string.IsNullOrEmpty(p.ImageUrl) && !p.ImageUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-                {
-                    p.ImageUrl = baseUrl + p.ImageUrl;
-                }
-            }
+            // Game-client asset download & local caching
+            await AssetSyncService.SyncProductImagesAsync(baseUrl, _config.StoreCode, _products);
 
             // Build Category Filter Pills in POS
             PanelCategoryTabs.Children.Clear();
@@ -1062,8 +1139,8 @@ public partial class MainWindow : Window
         try
         {
             _liveOrders = await _api.GetActiveOrdersAsync();
-            GridLiveOrders.ItemsSource = null;
-            GridLiveOrders.ItemsSource = _liveOrders;
+            ApplyLiveOrdersFilter();
+            CheckUnacceptedOrdersReminder();
 
             var tableRef = TxtTableRef?.Text?.Trim() ?? "";
             if (!string.IsNullOrWhiteSpace(tableRef))
@@ -1081,6 +1158,89 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ApplyLiveOrdersFilter()
+    {
+        if (_liveOrders == null) return;
+
+        List<OrderDto> filtered;
+        if (RbFilterNew?.IsChecked == true)
+        {
+            filtered = _liveOrders.Where(o => o.Status == OrderStatus.New).ToList();
+        }
+        else if (RbFilterCooking?.IsChecked == true)
+        {
+            filtered = _liveOrders.Where(o => o.Status == OrderStatus.Accepted || o.Status == OrderStatus.Preparing).ToList();
+        }
+        else if (RbFilterReady?.IsChecked == true)
+        {
+            filtered = _liveOrders.Where(o => o.Status == OrderStatus.Ready).ToList();
+        }
+        else if (RbFilterCompleted?.IsChecked == true)
+        {
+            filtered = _liveOrders.Where(o => o.Status == OrderStatus.Completed).ToList();
+        }
+        else
+        {
+            filtered = _liveOrders;
+        }
+
+        GridLiveOrders.ItemsSource = null;
+        GridLiveOrders.ItemsSource = filtered;
+    }
+
+    private void FilterOrders_Changed(object sender, RoutedEventArgs e)
+    {
+        ApplyLiveOrdersFilter();
+    }
+
+    private async Task ExecuteOrderStatusUpdateAsync(Button btn, int orderId, OrderStatus targetStatus, string successMessage)
+    {
+        if (_processingOrderIds.Contains(orderId)) return;
+
+        if (_config.ConfirmStatusChange)
+        {
+            var confirm = MessageBox.Show($"ต้องการเปลี่ยนสถานะออเดอร์เป็น {targetStatus} ใช่หรือไม่?", 
+                "ยืนยันการเปลี่ยนสถานะ", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes) return;
+        }
+
+        _processingOrderIds.Add(orderId);
+        var originalContent = btn.Content;
+        btn.Content = "[ กำลังบันทึก... ]";
+        btn.IsEnabled = false;
+        btn.Opacity = 0.55;
+
+        try
+        {
+            var operatorName = _currentUser?.FullName ?? _currentUser?.Username ?? "แคชเชียร์ POS";
+            var updatedOrder = await _api.UpdateOrderStatusAsync(orderId, targetStatus, operatorName, "POS");
+
+            // Auto print kitchen slip if status is Preparing and config is enabled
+            if (targetStatus == OrderStatus.Preparing && _config.AutoPrintKitchenOnPreparing && !string.IsNullOrWhiteSpace(_config.KitchenPrinterName))
+            {
+                var ord = _liveOrders.FirstOrDefault(o => o.Id == orderId) ?? updatedOrder;
+                if (ord != null)
+                {
+                    PrintingService.PrintKitchenSlip(ord, _config.KitchenPrinterName);
+                }
+            }
+
+            await RefreshLiveOrdersAsync();
+        }
+        catch (Exception ex)
+        {
+            PosLogger.Error($"[Orders] Failed to update order {orderId} to {targetStatus}: {ex.Message}", ex);
+            MessageBox.Show("ไม่สามารถปรับปรุงสถานะได้: " + ex.Message, "ข้อผิดพลาด", MessageBoxButton.OK, MessageBoxImage.Error);
+            btn.Content = originalContent;
+            btn.IsEnabled = true;
+            btn.Opacity = 1.0;
+        }
+        finally
+        {
+            _processingOrderIds.Remove(orderId);
+        }
+    }
+
     private async void BtnRefreshOrders_Click(object sender, RoutedEventArgs e)
     {
         await RefreshLiveOrdersAsync();
@@ -1090,8 +1250,15 @@ public partial class MainWindow : Window
     {
         if (sender is Button btn && btn.Tag is int orderId)
         {
-            await _api.UpdateOrderStatusAsync(orderId, OrderStatus.Accepted);
-            await RefreshLiveOrdersAsync();
+            await ExecuteOrderStatusUpdateAsync(btn, orderId, OrderStatus.Accepted, "รับออเดอร์แล้ว");
+        }
+    }
+
+    private async void BtnOrderPrepare_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is int orderId)
+        {
+            await ExecuteOrderStatusUpdateAsync(btn, orderId, OrderStatus.Preparing, "เริ่มปรุงแล้ว");
         }
     }
 
@@ -1099,8 +1266,27 @@ public partial class MainWindow : Window
     {
         if (sender is Button btn && btn.Tag is int orderId)
         {
-            await _api.UpdateOrderStatusAsync(orderId, OrderStatus.Ready);
-            await RefreshLiveOrdersAsync();
+            await ExecuteOrderStatusUpdateAsync(btn, orderId, OrderStatus.Ready, "ปรุงเสร็จแล้ว");
+        }
+    }
+
+    private async void BtnOrderComplete_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is int orderId)
+        {
+            await ExecuteOrderStatusUpdateAsync(btn, orderId, OrderStatus.Completed, "เสิร์ฟแล้ว");
+        }
+    }
+
+    private async void BtnOrderCancel_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is int orderId)
+        {
+            var confirm = MessageBox.Show($"ต้องการยกเลิกคำสั่งซื้อนี้ใช่หรือไม่?", "ยืนยันการยกเลิก", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirm == MessageBoxResult.Yes)
+            {
+                await ExecuteOrderStatusUpdateAsync(btn, orderId, OrderStatus.Cancelled, "ยกเลิกคำสั่งซื้อแล้ว");
+            }
         }
     }
 
@@ -1125,7 +1311,7 @@ public partial class MainWindow : Window
         var order = _liveOrders.FirstOrDefault(o => o.Id == orderId);
         if (order == null) return;
 
-        var dlg = new OrderDetailsDialog(order, _api, _config) { Owner = this };
+        var dlg = new OrderDetailsDialog(order, _api, _config, _realtime) { Owner = this };
         if (dlg.ShowDialog() == true)
         {
             _ = RefreshLiveOrdersAsync();
@@ -1144,6 +1330,35 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void BtnAlertAcceptOrder_Click(object sender, RoutedEventArgs e)
+    {
+        if (BtnAlertAcceptOrder.Tag is int orderId && orderId > 0)
+        {
+            BtnAlertAcceptOrder.IsEnabled = false;
+            BtnAlertAcceptOrder.Content = "[ กำลังรับออเดอร์... ]";
+            try
+            {
+                var operatorName = _currentUser?.FullName ?? _currentUser?.Username ?? "แคชเชียร์ POS";
+                await _api.UpdateOrderStatusAsync(orderId, OrderStatus.Accepted, operatorName, "POS");
+                await RefreshLiveOrdersAsync();
+            }
+            catch (Exception ex)
+            {
+                PosLogger.Error("[Alert] Failed to accept order from banner: " + ex.Message, ex);
+                MessageBox.Show("ไม่สามารถรับออเดอร์ได้: " + ex.Message, "ข้อผิดพลาด", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                BtnAlertAcceptOrder.IsEnabled = true;
+                BtnAlertAcceptOrder.Content = "[ รับออเดอร์ทันที ]";
+            }
+        }
+        else
+        {
+            TabOrders.IsChecked = true;
+        }
+    }
+
     private void BtnAlertViewOrders_Click(object sender, RoutedEventArgs e)
     {
         BorderAlert.Visibility = Visibility.Collapsed;
@@ -1153,6 +1368,115 @@ public partial class MainWindow : Window
     private void BtnAlertDismiss_Click(object sender, RoutedEventArgs e)
     {
         BorderAlert.Visibility = Visibility.Collapsed;
+        _snoozeBannerUntilNextCycle = true;
+    }
+
+    // -------------------------------------------------------------
+    // UNACCEPTED ORDERS REPEATING ALERT & ESCALATION SYSTEM
+    // -------------------------------------------------------------
+    private void CheckUnacceptedOrdersReminder()
+    {
+        if (_liveOrders == null || _liveOrders.Count == 0)
+        {
+            ResetUnacceptedOrderTracking();
+            return;
+        }
+
+        var unacceptedOrders = _liveOrders.Where(o => o.Status == OrderStatus.New).ToList();
+        if (unacceptedOrders.Count == 0)
+        {
+            ResetUnacceptedOrderTracking();
+            return;
+        }
+
+        var oldestOrder = unacceptedOrders.OrderBy(o => o.CreatedAt).FirstOrDefault() ?? unacceptedOrders[0];
+        var now = DateTime.UtcNow;
+
+        if (_unacceptedTrackingStartTime == null)
+        {
+            _unacceptedTrackingStartTime = oldestOrder.CreatedAt > DateTime.MinValue && oldestOrder.CreatedAt <= now
+                ? oldestOrder.CreatedAt
+                : now;
+            _lastUnacceptedAlertTime = now;
+            _currentEscalationRound = 1;
+            _snoozeBannerUntilNextCycle = false;
+            UpdateUnacceptedOrderBanner(unacceptedOrders, oldestOrder, 1, 0);
+            return;
+        }
+
+        var totalWaitingSec = (int)Math.Max(0, (now - _unacceptedTrackingStartTime.Value).TotalSeconds);
+        var intervalSec = _config.UnacceptedAlertIntervalSeconds > 0 ? _config.UnacceptedAlertIntervalSeconds : 30;
+        var secondsSinceLastAlert = (now - _lastUnacceptedAlertTime).TotalSeconds;
+
+        if (secondsSinceLastAlert >= intervalSec)
+        {
+            _currentEscalationRound++;
+            _lastUnacceptedAlertTime = now;
+            _snoozeBannerUntilNextCycle = false; // Reset snooze on alert cycle
+
+            if (_config.SoundEnabled && _config.RepeatAlertForUnacceptedOrders)
+            {
+                AudioAlertService.PlayEscalatingOrderAlert(
+                    _currentEscalationRound,
+                    _config.SoundVolume,
+                    _config.EscalateAlertVolumeAndPitch);
+            }
+
+            UpdateUnacceptedOrderBanner(unacceptedOrders, oldestOrder, _currentEscalationRound, totalWaitingSec);
+        }
+        else if (!_snoozeBannerUntilNextCycle)
+        {
+            UpdateUnacceptedOrderBanner(unacceptedOrders, oldestOrder, _currentEscalationRound, totalWaitingSec);
+        }
+    }
+
+    private void ResetUnacceptedOrderTracking()
+    {
+        if (_unacceptedTrackingStartTime != null || _currentEscalationRound > 0)
+        {
+            _unacceptedTrackingStartTime = null;
+            _lastUnacceptedAlertTime = DateTime.MinValue;
+            _currentEscalationRound = 0;
+            _snoozeBannerUntilNextCycle = false;
+
+            if (BorderAlert.Visibility == Visibility.Visible)
+            {
+                BorderAlert.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private void UpdateUnacceptedOrderBanner(List<OrderDto> unacceptedOrders, OrderDto oldestOrder, int round, int waitingSec)
+    {
+        if (_snoozeBannerUntilNextCycle) return;
+
+        BorderAlert.Visibility = Visibility.Visible;
+        BtnAlertAcceptOrder.Tag = oldestOrder.Id;
+        BtnAlertAcceptOrder.Visibility = Visibility.Visible;
+
+        var countText = unacceptedOrders.Count > 1 ? $" (รวม {unacceptedOrders.Count} ออเดอร์รอรับ)" : "";
+        var tableDisplay = string.IsNullOrWhiteSpace(oldestOrder.TableNumber) ? "กลับบ้าน/ออนไลน์" : $"โต๊ะ {oldestOrder.TableNumber}";
+
+        if (round <= 1)
+        {
+            BorderAlert.Background = new SolidColorBrush(Color.FromRgb(239, 108, 0)); // #EF6C00
+            TxtAlertMessage.Text = $"[ออเดอร์ใหม่] บิล #{oldestOrder.OrderNumber} ({tableDisplay}) ยอด {oldestOrder.TotalAmount:N2} บ.{countText} - กรุณากดรับออเดอร์";
+        }
+        else if (round == 2)
+        {
+            BorderAlert.Background = new SolidColorBrush(Color.FromRgb(230, 81, 0)); // #E65100
+            TxtAlertMessage.Text = $"[เตือนซ้ำรอบที่ 1 (+30 วิ | รอ {waitingSec} วิ)] บิล #{oldestOrder.OrderNumber} ({tableDisplay}){countText} ยังไม่ได้รับออเดอร์!";
+        }
+        else if (round == 3)
+        {
+            BorderAlert.Background = new SolidColorBrush(Color.FromRgb(216, 67, 21)); // #D84315
+            TxtAlertMessage.Text = $"[เตือนซ้ำรอบที่ 2 (+60 วิ | รอ {waitingSec} วิ)] บิล #{oldestOrder.OrderNumber} ({tableDisplay}){countText} กรุณารับออเดอร์ทันที!";
+        }
+        else
+        {
+            BorderAlert.Background = new SolidColorBrush(Color.FromRgb(198, 40, 40)); // #C62828
+            TxtAlertMessage.Text = $"[เตือนด่วนระดับสูงสุด! (+90 วิ | รอ {waitingSec} วิ)] บิล #{oldestOrder.OrderNumber} ({tableDisplay}){countText} รอนานเกินกำหนด!";
+        }
     }
 
     // -------------------------------------------------------------
@@ -1618,9 +1942,23 @@ public partial class MainWindow : Window
         AudioAlertService.TestAlert(vol);
     }
 
+    private void BtnTestEscalatedSound_Click(object sender, RoutedEventArgs e)
+    {
+        var vol = (int)SliderSoundVolume.Value;
+        AudioAlertService.TestEscalatedAlert(2, vol);
+    }
+
+    private void BtnTestUrgentSound_Click(object sender, RoutedEventArgs e)
+    {
+        var vol = (int)SliderSoundVolume.Value;
+        AudioAlertService.TestEscalatedAlert(4, vol);
+    }
+
     private void BtnSaveSound_Click(object sender, RoutedEventArgs e)
     {
         _config.SoundEnabled = ChkSoundEnabled.IsChecked == true;
+        _config.RepeatAlertForUnacceptedOrders = ChkRepeatAlert.IsChecked == true;
+        _config.EscalateAlertVolumeAndPitch = ChkEscalateSound.IsChecked == true;
         _config.SoundVolume = (int)SliderSoundVolume.Value;
         _config.Save();
         MessageBox.Show("บันทึกการตั้งค่าเสียงแจ้งเตือนเรียบร้อยแล้ว", "สำเร็จ", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1663,16 +2001,209 @@ public partial class MainWindow : Window
         MessageBox.Show("บันทึกข้อมูลร้านค้าและภาษีเรียบร้อยแล้ว", "สำเร็จ", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-    private void BtnServerConfig_Click(object sender, RoutedEventArgs e)
+    private async void BtnServerConfig_Click(object sender, RoutedEventArgs e)
     {
         var win = new ServerConfigDialog(_config) { Owner = this };
         if (win.ShowDialog() == true)
         {
             _config = PosConfig.Load();
-            _api = new ApiClient(_config.GetBaseUrl(), _config.StoreCode);
+            _api.UpdateConnection(_config.GetBaseUrl(), _config.StoreCode);
+            if (_realtime != null)
+            {
+                await _realtime.DisposeAsync();
+            }
             _realtime = new RealtimeClient(_config.GetBaseUrl(), _config.StoreCode);
             SetupRealtime();
             _ = InitializeSystemAsync();
         }
+    }
+
+    // -------------------------------------------------------------
+    // TAB 6: SETTINGS EXTENSIONS (Tables, Audit Logs, Advanced Sync)
+    // -------------------------------------------------------------
+    private async Task LoadTablesSettingsAsync()
+    {
+        try
+        {
+            _tablesList = await _api.GetTablesAsync();
+            GridTablesManager.ItemsSource = null;
+            GridTablesManager.ItemsSource = _tablesList;
+        }
+        catch (Exception ex)
+        {
+            PosLogger.Error("[Settings] Failed to load tables: " + ex.Message, ex);
+        }
+    }
+
+    private async void BtnRefreshTables_Click(object sender, RoutedEventArgs e)
+    {
+        await LoadTablesSettingsAsync();
+    }
+
+    private async void BtnAddNewTable_Click(object sender, RoutedEventArgs e)
+    {
+        var num = TxtNewTableNumber.Text.Trim();
+        if (string.IsNullOrWhiteSpace(num))
+        {
+            MessageBox.Show("กรุณากรอกเลขที่โต๊ะ", "แจ้งเตือน", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var name = TxtNewTableName.Text.Trim();
+        if (!int.TryParse(TxtNewTableCapacity.Text.Trim(), out var cap) || cap <= 0)
+        {
+            cap = 4;
+        }
+
+        try
+        {
+            await _api.CreateTableAsync(new CreateTableDto
+            {
+                TableNumber = num,
+                Name = string.IsNullOrWhiteSpace(name) ? $"โต๊ะ {num}" : name,
+                Capacity = cap
+            });
+
+            TxtNewTableNumber.Clear();
+            TxtNewTableName.Clear();
+            TxtNewTableCapacity.Text = "4";
+
+            await LoadTablesSettingsAsync();
+            UpdateTableButtonsVisuals();
+            MessageBox.Show($"เพิ่มโต๊ะ {num} เรียบร้อยแล้ว", "สำเร็จ", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            PosLogger.Error("[Settings] Failed to create table: " + ex.Message, ex);
+            MessageBox.Show("ไม่สามารถเพิ่มโต๊ะได้: " + ex.Message, "ข้อผิดพลาด", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void BtnToggleTableStatus_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is int tableId)
+        {
+            var table = _tablesList.FirstOrDefault(t => t.Id == tableId);
+            if (table == null) return;
+
+            var targetStatus = table.Status == TableStatus.Occupied ? TableStatus.Available : TableStatus.Occupied;
+            try
+            {
+                await _api.UpdateTableStatusAsync(tableId, targetStatus);
+                await LoadTablesSettingsAsync();
+                UpdateTableButtonsVisuals();
+            }
+            catch (Exception ex)
+            {
+                PosLogger.Error($"[Settings] Failed to update table {tableId} status: " + ex.Message, ex);
+                MessageBox.Show("ไม่สามารถเปลี่ยนสถานะโต๊ะได้: " + ex.Message, "ข้อผิดพลาด", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    private async void BtnDeleteTable_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is int tableId)
+        {
+            var table = _tablesList.FirstOrDefault(t => t.Id == tableId);
+            if (table == null) return;
+
+            var confirm = MessageBox.Show($"ต้องการลบโต๊ะ {table.TableNumber} ใช่หรือไม่?", "ยืนยันการลบ", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirm != MessageBoxResult.Yes) return;
+
+            try
+            {
+                var success = await _api.DeleteTableAsync(tableId);
+                if (success)
+                {
+                    await LoadTablesSettingsAsync();
+                    UpdateTableButtonsVisuals();
+                    MessageBox.Show($"ลบโต๊ะ {table.TableNumber} เรียบร้อยแล้ว", "สำเร็จ", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                PosLogger.Error($"[Settings] Failed to delete table {tableId}: " + ex.Message, ex);
+                MessageBox.Show("ไม่สามารถลบโต๊ะได้: " + ex.Message, "ข้อผิดพลาด", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    private async Task LoadAuditLogsAsync(string? search = null)
+    {
+        try
+        {
+            var logs = await _api.GetAuditLogsAsync(100, search);
+            GridAuditLogs.ItemsSource = null;
+            GridAuditLogs.ItemsSource = logs;
+        }
+        catch (Exception ex)
+        {
+            PosLogger.Error("[Settings] Failed to load audit logs: " + ex.Message, ex);
+        }
+    }
+
+    private async void BtnSearchAudit_Click(object sender, RoutedEventArgs e)
+    {
+        await LoadAuditLogsAsync(TxtSearchAudit.Text.Trim());
+    }
+
+    private async void BtnRefreshAudit_Click(object sender, RoutedEventArgs e)
+    {
+        TxtSearchAudit.Clear();
+        await LoadAuditLogsAsync();
+    }
+
+    private void LoadAdvancedSettings()
+    {
+        ChkShowActivityBanner.IsChecked = _config.ShowActivityNotifications;
+        ChkConfirmStatusChange.IsChecked = _config.ConfirmStatusChange;
+        ChkAutoPrintOnPreparing.IsChecked = _config.AutoPrintKitchenOnPreparing;
+
+        switch (_config.OrderAutoRefreshSeconds)
+        {
+            case 5: CmbAutoRefreshInterval.SelectedIndex = 1; break;
+            case 10: CmbAutoRefreshInterval.SelectedIndex = 2; break;
+            case 30: CmbAutoRefreshInterval.SelectedIndex = 3; break;
+            default: CmbAutoRefreshInterval.SelectedIndex = 0; break;
+        }
+
+        SetupAutoRefreshTimer();
+    }
+
+    private void SetupAutoRefreshTimer()
+    {
+        _autoRefreshTimer?.Stop();
+        if (_config.OrderAutoRefreshSeconds > 0)
+        {
+            _autoRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(_config.OrderAutoRefreshSeconds) };
+            _autoRefreshTimer.Tick += (s, e) =>
+            {
+                if (TabOrders.IsChecked == true)
+                {
+                    _ = RefreshLiveOrdersAsync();
+                }
+            };
+            _autoRefreshTimer.Start();
+        }
+    }
+
+    private void BtnSaveAdvancedSettings_Click(object sender, RoutedEventArgs e)
+    {
+        _config.ShowActivityNotifications = ChkShowActivityBanner.IsChecked == true;
+        _config.ConfirmStatusChange = ChkConfirmStatusChange.IsChecked == true;
+        _config.AutoPrintKitchenOnPreparing = ChkAutoPrintOnPreparing.IsChecked == true;
+
+        _config.OrderAutoRefreshSeconds = CmbAutoRefreshInterval.SelectedIndex switch
+        {
+            1 => 5,
+            2 => 10,
+            3 => 30,
+            _ => 0
+        };
+
+        _config.Save();
+        SetupAutoRefreshTimer();
+        MessageBox.Show("บันทึกการตั้งค่าระบบ Sync & Workflow เรียบร้อยแล้ว", "สำเร็จ", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 }

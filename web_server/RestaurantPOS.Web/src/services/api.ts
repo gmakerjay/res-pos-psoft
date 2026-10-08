@@ -215,6 +215,15 @@ export function getStoredTenantCode(): string {
 export function setStoredTenantCode(code: string) {
   const normalized = (code || 'DEFAULT').trim().toUpperCase();
   localStorage.setItem('pos_tenant_code', normalized);
+  if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('store', normalized);
+      window.history.replaceState({}, '', url.toString());
+    } catch {
+      // Ignore if URL modification fails in some environments
+    }
+  }
 }
 
 export function getStoredToken(): string | null {
@@ -231,10 +240,19 @@ export function getStoredUser(): AuthUser | null {
   }
 }
 
-export async function login(username: string, password: string): Promise<LoginResponseData> {
+export async function login(username: string, password: string, storeCode?: string): Promise<LoginResponseData> {
+  const cleanCode = (storeCode || getStoredTenantCode() || 'DEFAULT').trim().toUpperCase();
+  setStoredTenantCode(cleanCode);
   const res = await request<LoginResponseData>('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ username, password })
+    headers: {
+      'X-Tenant-Code': cleanCode
+    },
+    body: JSON.stringify({ 
+      username: username.trim(), 
+      password: password,
+      storeCode: cleanCode 
+    })
   });
   localStorage.setItem('pos_jwt_token', res.token);
   localStorage.setItem('pos_user', JSON.stringify(res.user));
@@ -268,33 +286,8 @@ export async function generateStoreCode(): Promise<string> {
   return res.code;
 }
 
-export async function getAllStores(): Promise<TenantItem[]> {
-  return request<TenantItem[]>('/api/stores/all');
-}
-
-export async function upgradeStoreLicense(data: { storeCode: string; plan: string; extendDays: number }): Promise<TenantItem> {
-  return request<TenantItem>('/api/stores/license/upgrade', {
-    method: 'POST',
-    body: JSON.stringify(data)
-  });
-}
-
 export async function activateStoreLicense(data: { storeCode: string; licenseKey: string }): Promise<TenantItem> {
   return request<TenantItem>('/api/stores/license/activate', {
-    method: 'POST',
-    body: JSON.stringify(data)
-  });
-}
-
-export async function generateLicenseKey(data: { storeCode: string; plan: string }): Promise<GenerateKeyResponse> {
-  return request<GenerateKeyResponse>('/api/stores/license/generate-key', {
-    method: 'POST',
-    body: JSON.stringify(data)
-  });
-}
-
-export async function toggleStoreStatus(data: { storeCode: string; isActive: boolean }): Promise<TenantItem> {
-  return request<TenantItem>('/api/stores/license/toggle-status', {
     method: 'POST',
     body: JSON.stringify(data)
   });
@@ -432,10 +425,16 @@ export async function trackOrdersByPhone(phone: string): Promise<Order[]> {
   return request<Order[]>(`/api/orders/track/${encodeURIComponent(phone.trim())}`);
 }
 
-export async function updateOrderStatus(orderId: number, status: number): Promise<Order> {
+export async function updateOrderStatus(orderId: number, status: number, updatedBy?: string, source: string = 'WEB_KITCHEN'): Promise<Order> {
+  const user = getStoredUser();
+  const operator = updatedBy || user?.fullName || user?.username || 'ฝ่ายครัว (Web)';
   return request<Order>(`/api/orders/${orderId}/status`, {
     method: 'PUT',
-    body: JSON.stringify({ status })
+    body: JSON.stringify({ 
+      status,
+      updatedBy: operator,
+      source
+    })
   });
 }
 

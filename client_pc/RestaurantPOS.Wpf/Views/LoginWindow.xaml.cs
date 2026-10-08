@@ -21,15 +21,35 @@ public partial class LoginWindow : Window
         {
             TxtUsername.Text = "admin";
         }
-        if (string.IsNullOrEmpty(TxtPassword.Password))
+        if (_config.StoreCode == "DEFAULT")
         {
-            TxtPassword.Password = "psoft123";
+            if (string.IsNullOrEmpty(TxtPassword.Password))
+            {
+                TxtPassword.Password = "psoft123";
+            }
         }
-        Loaded += (s, e) => BtnLogin.Focus();
+        else
+        {
+            TxtPassword.Password = "";
+        }
+        Loaded += (s, e) => 
+        {
+            if (string.IsNullOrEmpty(TxtPassword.Password))
+            {
+                TxtPassword.Focus();
+            }
+            else
+            {
+                BtnLogin.Focus();
+            }
+        };
     }
 
     private void BtnQuickDemo_Click(object sender, RoutedEventArgs e)
     {
+        _config.StoreCode = "DEFAULT";
+        _api.UpdateConnection(_config.GetBaseUrl(), "DEFAULT");
+        UpdateSubtitle();
         TxtUsername.Text = "admin";
         TxtPassword.Password = "psoft123";
         BtnLogin_Click(sender, e);
@@ -38,6 +58,14 @@ public partial class LoginWindow : Window
     private void UpdateSubtitle()
     {
         TxtLoginSubtitle.Text = $"เข้าสู่ระบบประจำร้าน: {_config.StoreCode} (เซิร์ฟเวอร์: {_config.GetBaseUrl()})";
+        if (_config.StoreCode == "DEFAULT")
+        {
+            TxtPasswordHint.Text = "* รหัสผ่านร้านตัวอย่าง: psoft123 (หรือ 123456)";
+        }
+        else
+        {
+            TxtPasswordHint.Text = $"* ร้าน {_config.StoreCode}: ใช้รหัสผ่านที่คุณตั้งไว้ตอนลงทะเบียน (หรือ 123456)";
+        }
     }
 
     private async void BtnLogin_Click(object sender, RoutedEventArgs e)
@@ -57,7 +85,7 @@ public partial class LoginWindow : Window
 
         try
         {
-            var user = await _api.LoginAsync(username, password);
+            var user = await _api.LoginAsync(username, password, _config.StoreCode);
             AuthenticatedUser = user;
             DialogResult = true;
             Close();
@@ -86,9 +114,15 @@ public partial class LoginWindow : Window
         var dialog = new ServerConfigDialog(_config);
         if (dialog.ShowDialog() == true)
         {
+            _api.UpdateConnection(_config.GetBaseUrl(), _config.StoreCode);
             UpdateSubtitle();
+            if (_config.StoreCode != "DEFAULT")
+            {
+                TxtPassword.Password = "";
+                TxtPassword.Focus();
+            }
             MessageBox.Show(
-                $"บันทึกการตั้งค่าเรียบร้อยแล้ว [ร้านค้า: {_config.StoreCode}]",
+                $"บันทึกการตั้งค่าเรียบร้อยแล้ว [ร้านค้า: {_config.StoreCode}]\nระบบอัปเดตการเชื่อมต่อไปยังร้านค้านี้แล้ว กรุณาเข้าสู่ระบบ",
                 "บันทึกสำเร็จ",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);

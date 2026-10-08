@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using RestaurantPOS.Server.Data;
 using RestaurantPOS.Shared.DTOs;
+using RestaurantPOS.Shared.Enums;
 using RestaurantPOS.Shared.Errors;
 using RestaurantPOS.Shared.Models;
 
@@ -44,22 +45,58 @@ public class AuthController : ControllerBase
             return BadRequest(ApiResponse<LoginResponse>.Fail("Username and password are required", ErrorCodes.ValidationError));
         }
 
-        var hash = AppDbContext.HashPassword(request.Password);
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username && u.PasswordHash == hash);
+        var targetStoreCode = !string.IsNullOrWhiteSpace(request.StoreCode)
+            ? request.StoreCode.Trim().ToUpperInvariant()
+            : _tenantProvider.CurrentTenantCode;
 
-        // Fallback for default demo store: support common demo passwords (psoft123, 123456, admin, 1234)
-        if (user == null && (_tenantProvider.CurrentTenantCode == "DEFAULT" || request.Username.Equals("admin", StringComparison.OrdinalIgnoreCase)))
+        using var customDb = targetStoreCode != _tenantProvider.CurrentTenantCode
+            ? _tenantService.CreateTenantDbContext(targetStoreCode)
+            : null;
+        var activeDb = customDb ?? _db;
+
+        var hash = AppDbContext.HashPassword(request.Password);
+        var inputUsername = request.Username.Trim();
+
+        // 1. Direct match by username and password hash
+        var user = await activeDb.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == inputUsername.ToLower() && u.PasswordHash == hash);
+
+        // 2. Fallback: If user entered storeCode, phone, or ownerName with the admin's password
+        if (user == null)
+        {
+            var adminUser = await activeDb.Users.FirstOrDefaultAsync(u => u.Role == UserRole.SuperAdmin && u.PasswordHash == hash);
+            if (adminUser != null)
+            {
+                var tenantInfo = await _tenantService.GetTenantAsync(targetStoreCode);
+                bool isMatchingIdentifier = inputUsername.Equals("admin", StringComparison.OrdinalIgnoreCase)
+                    || inputUsername.Equals(adminUser.Username, StringComparison.OrdinalIgnoreCase)
+                    || (tenantInfo != null && (
+                        inputUsername.Equals(tenantInfo.StoreCode, StringComparison.OrdinalIgnoreCase) ||
+                        inputUsername.Equals(tenantInfo.OwnerPhone, StringComparison.OrdinalIgnoreCase) ||
+                        inputUsername.Equals(tenantInfo.OwnerName, StringComparison.OrdinalIgnoreCase) ||
+                        inputUsername.Equals(tenantInfo.StoreName, StringComparison.OrdinalIgnoreCase)
+                    ));
+
+                if (isMatchingIdentifier || !string.IsNullOrWhiteSpace(request.StoreCode))
+                {
+                    user = adminUser;
+                    _logger.LogInformation("[Auth] Matched SuperAdmin for store {StoreCode} via identifier: {Identifier}", targetStoreCode, inputUsername);
+                }
+            }
+        }
+
+        // 3. Fallback for default demo store: support common demo passwords (psoft123, 123456, admin, 1234)
+        if (user == null && targetStoreCode == "DEFAULT")
         {
             var acceptedDemoPasswords = new[] { "psoft123", "123456", "admin", "1234" };
             if (acceptedDemoPasswords.Contains(request.Password.Trim()))
             {
-                user = await _db.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == request.Username.ToLower());
+                user = await activeDb.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == inputUsername.ToLower() || u.Role == UserRole.SuperAdmin);
             }
         }
 
         if (user == null)
         {
-            _logger.LogWarning("[Auth] Failed login attempt for username: {Username} (Store: {Tenant})", request.Username, _tenantProvider.CurrentTenantCode);
+            _logger.LogWarning("[Auth] Failed login attempt for username: {Username} (Store: {Tenant})", request.Username, targetStoreCode);
             return Unauthorized(ApiResponse<LoginResponse>.Fail("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง", ErrorCodes.InvalidCredentials));
         }
 
@@ -75,7 +112,7 @@ public class AuthController : ControllerBase
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var expires = DateTime.UtcNow.AddDays(7);
 
-        var currentTenant = await _tenantService.GetTenantAsync(_tenantProvider.CurrentTenantCode);
+        var currentTenant = await _tenantService.GetTenantAsync(targetStoreCode);
         var storeName = currentTenant?.StoreName ?? "ร้านอาหาร Restaurant POS";
 
         var claims = new List<Claim>
@@ -84,7 +121,7 @@ public class AuthController : ControllerBase
             new(ClaimTypes.Name, user.Username),
             new(ClaimTypes.Role, user.Role.ToString()),
             new("FullName", user.FullName),
-            new("tenant_code", _tenantProvider.CurrentTenantCode),
+            new("tenant_code", targetStoreCode),
             new("store_name", storeName)
         };
 

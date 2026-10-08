@@ -7,4 +7,10 @@
     <Project Path="client_pc/RestaurantPOS.Wpf/RestaurantPOS.Wpf.csproj" />
     <Project Path="client_pc/RestaurantPOS.Shared/RestaurantPOS.Shared.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RestaurantPOS.Tests/RestaurantPOS.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/RestaurantPOS.KeyGen/RestaurantPOS.KeyGen.csproj" />
+  </Folder>
 </Solution>

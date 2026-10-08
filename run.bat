@@ -4,11 +4,11 @@ setlocal enabledelayedexpansion
 
 set "ROOT=%~dp0"
 set "SERVER_DIR=%ROOT%web_server\RestaurantPOS.Server"
-set "WPF_DIR=%ROOT%client_pc\RestaurantPOS.Wpf\bin\Debug\net10.0-windows"
-set "WPF_EXE=%WPF_DIR%\RestaurantPOS.Wpf.exe"
+set "WPF_DIR=%ROOT%client_pc\RestaurantPOS.Wpf\bin\Release\net10.0-windows"
+set "WPF_EXE=%WPF_DIR%\Psoft-RES Online.exe"
 set "WEB_DIR=%ROOT%web_server\RestaurantPOS.Web"
 set "CLIENT_RELEASE_DIR=%ROOT%build_output\client_pc"
-set "CLIENT_RELEASE_EXE=%CLIENT_RELEASE_DIR%\RestaurantPOS.Wpf.exe"
+set "CLIENT_RELEASE_EXE=%CLIENT_RELEASE_DIR%\Psoft-RES Online.exe"
 
 cls
 echo ======================================================================
@@ -21,10 +21,11 @@ echo   [3] Start Central Server (ASP.NET Core Port 5000)
 echo   [4] Start Web App Dev Server (Vite Port 5173)
 echo   [5] Build Entire Solution (RestaurantPOS.slnx)
 echo   [6] Launch Published Client POS (build_output)
+echo   [7] Launch Developer KeyGen Tool (Private Key Generator)
 echo   [0] Exit
 echo.
 echo ======================================================================
-set /p opt="Select an option (0-6): "
+set /p opt="Select an option (0-7): "
 
 if "%opt%"=="1" goto run_all
 if "%opt%"=="2" goto run_pos
@@ -32,6 +33,7 @@ if "%opt%"=="3" goto run_server
 if "%opt%"=="4" goto run_web
 if "%opt%"=="5" goto run_build
 if "%opt%"=="6" goto run_release
+if "%opt%"=="7" goto run_keygen
 if "%opt%"=="0" goto end
 goto end
 
@@ -103,6 +105,12 @@ if exist "%CLIENT_RELEASE_EXE%" (
     echo [ERROR] %CLIENT_RELEASE_EXE% not found.
     pause
 )
+goto end
+
+:run_keygen
+echo.
+echo [*] Launching Developer KeyGen Tool...
+call "%ROOT%run_keygen.bat"
 goto end
 
 :end

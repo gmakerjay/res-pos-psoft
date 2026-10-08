@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { registerStore } from '../services/api';
+import { registerStore, setStoredTenantCode } from '../services/api';
 import type { StoreInfo } from '../services/api';
 
 interface SoftwareLandingViewProps {
@@ -500,7 +500,7 @@ export function SoftwareLandingView({ onOpenLogin, onStoreCreated, onEnterDemo }
                     {' '}และเซิร์ฟเวอร์: <code style={{ backgroundColor: '#E0E0E0', padding: '2px 5px', borderRadius: '3px' }}>https://spk.p-services.net</code>
                   </li>
                   <li>
-                    เข้าสู่ระบบด้วยรหัสผ่านที่คุณตั้งไว้ (<strong style={{ color: '#2E7D32' }}>{adminPassword}</strong>) และเริ่มขายอาหารได้ทันที!
+                    เข้าสู่ระบบด้วยชื่อผู้ใช้: <strong style={{ color: '#0D47A1' }}>admin</strong> (หรือเบอร์โทร: <strong style={{ color: '#0D47A1' }}>{ownerPhone || 'เบอร์ที่ลงทะเบียน'}</strong>) และรหัสผ่านที่คุณตั้งไว้ (<strong style={{ color: '#2E7D32' }}>{adminPassword}</strong>) เพื่อเริ่มขายอาหารได้ทันที!
                   </li>
                 </ol>
 
@@ -566,7 +566,10 @@ export function SoftwareLandingView({ onOpenLogin, onStoreCreated, onEnterDemo }
 
                 <button
                   type="button"
-                  onClick={() => onOpenLogin(createdStore.storeCode)}
+                  onClick={() => {
+                    setStoredTenantCode(createdStore.storeCode);
+                    onOpenLogin(createdStore.storeCode);
+                  }}
                   style={{
                     padding: '12px',
                     borderRadius: '6px',

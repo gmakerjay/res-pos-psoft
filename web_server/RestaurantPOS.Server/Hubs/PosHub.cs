@@ -134,4 +134,16 @@ public class PosHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
         _logger.LogDebug("[SignalR] Client {ConnectionId} joined role group {GroupName}", Context.ConnectionId, groupName);
     }
+
+    public async Task NotifyOrderAction(OrderActionActivityDto action)
+    {
+        var tenantCode = Context.Items["TenantCode"]?.ToString() ?? "DEFAULT";
+        if (action.Timestamp == default)
+        {
+            action.Timestamp = DateTime.UtcNow;
+        }
+        _logger.LogInformation("[SignalR] Order Action Activity from {Source} by {Operator}: {Description}", 
+            action.Source, action.OperatorName, action.ActionDescription);
+        await _notifier.BroadcastTenantAsync(tenantCode, HubEvents.OrderActionActivity, action);
+    }
 }

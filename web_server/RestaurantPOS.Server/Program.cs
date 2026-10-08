@@ -166,3 +166,5 @@ app.MapFallbackToFile("index.html");
 
 Log.Information("[Startup] Restaurant POS Central Server starting on .NET 10...");
 app.Run();
+
+public partial class Program { }

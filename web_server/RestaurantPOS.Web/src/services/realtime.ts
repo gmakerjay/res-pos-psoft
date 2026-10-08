@@ -12,6 +12,18 @@ export interface StoreStatusEventData {
   timestamp?: string;
 }
 
+export interface OrderActionActivity {
+  orderId: number;
+  orderNumber: string;
+  tableDisplay?: string;
+  previousStatus: number;
+  newStatus: number;
+  source: string;
+  operatorName: string;
+  actionDescription: string;
+  timestamp: string;
+}
+
 export class RealtimeService {
   private hub: signalR.HubConnection | null = null;
   private stateListeners: ((state: ConnectionState) => void)[] = [];
@@ -23,6 +35,7 @@ export class RealtimeService {
   private categoryUpdatedListeners: ((data: any) => void)[] = [];
   private ingredientUpdatedListeners: ((data: any) => void)[] = [];
   private storeStatusListeners: ((data: StoreStatusEventData) => void)[] = [];
+  private orderActionListeners: ((data: OrderActionActivity) => void)[] = [];
 
   public start() {
     if (this.hub) return;
@@ -81,6 +94,11 @@ export class RealtimeService {
     this.hub.on('StoreStatusChanged', (data: StoreStatusEventData) => {
       logInfo(`Store status changed for ${data.storeCode}: Online=${data.isOnline}, Terminals=${data.activePosCount}`, 'Web-SignalR');
       this.storeStatusListeners.forEach(cb => cb(data));
+    });
+
+    this.hub.on('OrderActionActivity', (data: OrderActionActivity) => {
+      logInfo(`Order Action Activity: ${data.actionDescription}`, 'Web-SignalR');
+      this.orderActionListeners.forEach(cb => cb(data));
     });
 
     this.hub.start()
@@ -162,6 +180,13 @@ export class RealtimeService {
     this.storeStatusListeners.push(cb);
     return () => {
       this.storeStatusListeners = this.storeStatusListeners.filter(l => l !== cb);
+    };
+  }
+
+  public onOrderActionActivity(cb: (data: OrderActionActivity) => void) {
+    this.orderActionListeners.push(cb);
+    return () => {
+      this.orderActionListeners = this.orderActionListeners.filter(l => l !== cb);
     };
   }
 

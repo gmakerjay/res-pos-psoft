@@ -117,18 +117,27 @@
         <!-- 3. Bottom Action Bar -->
         <Border Grid.Row="2" Background="#D8D4C8" BorderBrush="#9E9A8E" BorderThickness="0,1,0,0" Padding="14,10">
             <DockPanel LastChildFill="False">
-                <Button x:Name="BtnAcceptOrder" Content="รับออเดอร์" Height="38" Padding="16,0" Margin="0,0,8,0"
-                        Background="#1D4ED8" Foreground="White" BorderBrush="#1E40AF" FontWeight="Bold" FontSize="14"
+                <Button x:Name="BtnAcceptOrder" Content="[ รับออเดอร์ ]" Height="38" Padding="14,0" Margin="0,0,6,0"
+                        Background="#1D4ED8" Foreground="White" BorderBrush="#1E40AF" FontWeight="Bold" FontSize="13.5"
                         Click="BtnAcceptOrder_Click" Cursor="Hand"/>
-                <Button x:Name="BtnReadyOrder" Content="ปรุงเสร็จแล้ว" Height="38" Padding="16,0" Margin="0,0,8,0"
-                        Background="#EA580C" Foreground="White" BorderBrush="#C2410C" FontWeight="Bold" FontSize="14"
+                <Button x:Name="BtnPrepareOrder" Content="[ กำลังปรุง ]" Height="38" Padding="14,0" Margin="0,0,6,0"
+                        Background="#D97706" Foreground="White" BorderBrush="#B45309" FontWeight="Bold" FontSize="13.5"
+                        Click="BtnPrepareOrder_Click" Cursor="Hand"/>
+                <Button x:Name="BtnReadyOrder" Content="[ ปรุงเสร็จแล้ว ]" Height="38" Padding="14,0" Margin="0,0,6,0"
+                        Background="#EA580C" Foreground="White" BorderBrush="#C2410C" FontWeight="Bold" FontSize="13.5"
                         Click="BtnReadyOrder_Click" Cursor="Hand"/>
-                <Button x:Name="BtnPrintKitchen" Content="พิมพ์สลิปครัว" Height="38" Padding="16,0" Margin="0,0,8,0"
-                        Background="#F1F5F9" Foreground="#1E293B" BorderBrush="#CBD5E1" FontWeight="SemiBold" FontSize="14"
+                <Button x:Name="BtnCompleteOrder" Content="[ เสิร์ฟแล้ว ]" Height="38" Padding="14,0" Margin="0,0,6,0"
+                        Background="#15803D" Foreground="White" BorderBrush="#166534" FontWeight="Bold" FontSize="13.5"
+                        Click="BtnCompleteOrder_Click" Cursor="Hand"/>
+                <Button x:Name="BtnCancelOrder" Content="[ ยกเลิกบิล ]" Height="38" Padding="12,0" Margin="0,0,10,0"
+                        Background="#DC2626" Foreground="White" BorderBrush="#B91C1C" FontWeight="Bold" FontSize="13.5"
+                        Click="BtnCancelOrder_Click" Cursor="Hand"/>
+                <Button x:Name="BtnPrintKitchen" Content="พิมพ์สลิปครัว" Height="38" Padding="14,0" Margin="0,0,6,0"
+                        Background="#F1F5F9" Foreground="#1E293B" BorderBrush="#CBD5E1" FontWeight="SemiBold" FontSize="13.5"
                         Click="BtnPrintKitchen_Click" Cursor="Hand"/>
                 
-                <Button Content="ปิดหน้าต่าง" Height="38" Padding="20,0" DockPanel.Dock="Right"
-                        Background="#E2E8F0" Foreground="#1E293B" BorderBrush="#94A3B8" FontWeight="SemiBold" FontSize="14"
+                <Button Content="ปิดหน้าต่าง" Height="38" Padding="18,0" DockPanel.Dock="Right"
+                        Background="#E2E8F0" Foreground="#1E293B" BorderBrush="#94A3B8" FontWeight="SemiBold" FontSize="13.5"
                         Click="BtnClose_Click" Cursor="Hand"/>
             </DockPanel>
         </Border>

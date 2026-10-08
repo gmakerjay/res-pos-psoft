@@ -12,8 +12,8 @@ public class ApiClient
 {
     private readonly HttpClient _http;
     private readonly JsonSerializerOptions _jsonOptions;
-    public string BaseUrl { get; }
-    public string StoreCode { get; }
+    public string BaseUrl { get; private set; }
+    public string StoreCode { get; private set; }
 
     public ApiClient(string baseUrl = "http://localhost:5000", string storeCode = "DEFAULT")
     {
@@ -33,6 +33,17 @@ public class ApiClient
         PosLogger.SetServerUrl(BaseUrl);
     }
 
+    public void UpdateConnection(string baseUrl, string storeCode)
+    {
+        BaseUrl = baseUrl.TrimEnd('/');
+        StoreCode = string.IsNullOrWhiteSpace(storeCode) ? "DEFAULT" : storeCode.Trim().ToUpperInvariant();
+        _http.BaseAddress = new Uri(BaseUrl);
+        _http.DefaultRequestHeaders.Remove("X-Tenant-Code");
+        _http.DefaultRequestHeaders.Add("X-Tenant-Code", StoreCode);
+        PosLogger.SetServerUrl(BaseUrl);
+        PosLogger.Info($"[API] Updated connection to {BaseUrl} (Store: {StoreCode})");
+    }
+
     public string? AuthToken { get; private set; }
     public UserDto? CurrentUser { get; private set; }
 
@@ -50,11 +61,22 @@ public class ApiClient
         }
     }
 
-    public async Task<UserDto> LoginAsync(string username, string password)
+    public async Task<UserDto> LoginAsync(string username, string password, string? storeCode = null)
     {
         try
         {
-            var req = new LoginRequest { Username = username, Password = password };
+            var code = !string.IsNullOrWhiteSpace(storeCode) ? storeCode.Trim().ToUpperInvariant() : StoreCode;
+            if (code != StoreCode)
+            {
+                UpdateConnection(BaseUrl, code);
+            }
+
+            var req = new LoginRequest 
+            { 
+                Username = username, 
+                Password = password,
+                StoreCode = code
+            };
             var res = await _http.PostAsJsonAsync("/api/auth/login", req);
             var result = await res.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
             if (result != null && result.Success && result.Data != null)
@@ -62,7 +84,7 @@ public class ApiClient
                 AuthToken = result.Data.Token;
                 CurrentUser = result.Data.User;
                 _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthToken);
-                PosLogger.Info($"[Auth] Logged in successfully: {CurrentUser.Username} ({CurrentUser.Role})");
+                PosLogger.Info($"[Auth] Logged in successfully: {CurrentUser.Username} ({CurrentUser.Role}) [Store: {code}]");
                 return CurrentUser;
             }
             throw new Exception(result?.Message ?? "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
@@ -206,11 +228,16 @@ public class ApiClient
         }
     }
 
-    public async Task<OrderDto?> UpdateOrderStatusAsync(int id, OrderStatus status)
+    public async Task<OrderDto?> UpdateOrderStatusAsync(int id, OrderStatus status, string? updatedBy = null, string? source = "POS")
     {
         try
         {
-            var req = new UpdateOrderStatusRequest { Status = status };
+            var req = new UpdateOrderStatusRequest 
+            { 
+                Status = status,
+                UpdatedBy = !string.IsNullOrWhiteSpace(updatedBy) ? updatedBy : (CurrentUser?.FullName ?? CurrentUser?.Username ?? "แคชเชียร์"),
+                Source = !string.IsNullOrWhiteSpace(source) ? source : "POS"
+            };
             var res = await _http.PutAsJsonAsync($"/api/orders/{id}/status", req);
             var result = await res.Content.ReadFromJsonAsync<ApiResponse<OrderDto>>(_jsonOptions);
             return result?.Data;
@@ -537,6 +564,25 @@ public class ApiClient
         {
             PosLogger.Warn($"[Licensing] Activation failed: {ex.Message}");
             throw;
+        }
+    }
+
+    public async Task<List<AuditLogDto>> GetAuditLogsAsync(int limit = 100, string? search = null)
+    {
+        try
+        {
+            var url = $"/api/audit?limit={limit}";
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                url += $"&search={Uri.EscapeDataString(search.Trim())}";
+            }
+            var res = await _http.GetFromJsonAsync<ApiResponse<List<AuditLogDto>>>(url, _jsonOptions);
+            return res?.Data ?? new List<AuditLogDto>();
+        }
+        catch (Exception ex)
+        {
+            PosLogger.Error("[API] Failed to get audit logs: " + ex.Message, ex);
+            return new List<AuditLogDto>();
         }
     }
 }

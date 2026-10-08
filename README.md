@@ -56,12 +56,16 @@ res-pos_psoft/
 │   ├── run_pos.bat                     # รันหรือบิลด์โปรแกรม Desktop POS ทันที
 │   └── build_client.bat                # คอมไพล์โหมด Release และส่งออกไปยัง build_output
 │
+├── tools/                              # [ส่วนพิเศษ] เครื่องมือนักพัฒนา (Developer Only - เก็บส่วนตัว)
+│   └── RestaurantPOS.KeyGen/           # โปรแกรมออกคีย์ลิขสิทธิ์ผูกฮาร์ดแวร์ (RSA-2048 Asymmetric Signature)
+│
 ├── build_output/                       # [ส่วนที่ 3] โฟลเดอร์โปรแกรมที่บิลด์ออกมาแล้ว (รอคำสั่ง Deploy)
-│   ├── client_pc/                      # ไฟล์บิลด์ตัวเต็มของ Windows Desktop POS (มี RestaurantPOS.Wpf.exe)
+│   ├── client_pc/                      # ไฟล์บิลด์ตัวเต็มของ Windows Desktop POS (Psoft-RES Online.exe)
 │   └── web_server/                     # ไฟล์บิลด์ตัวเต็มของ Central Server + Web SPA ใน wwwroot
 │
 ├── RestaurantPOS.slnx                  # Master Solution File รวมทุกโปรเจกต์
 ├── run.bat                             # Master Quick Launcher เมนูลัดสำหรับรันทั้งระบบ
+├── run_keygen.bat                      # ลัดเปิดรัน Developer KeyGen Software
 ├── run_pos.bat                         # ลัดเปิดรัน Client POS หน้าร้าน
 ├── run_server.bat                      # ลัดเปิดรัน Central Server
 ├── run_web.bat                         # ลัดเปิดรัน Web App Dev Server
@@ -84,6 +88,7 @@ res-pos_psoft/
   [4] Start Web App Dev Server (Vite Port 5173)
   [5] Build Entire Solution (RestaurantPOS.slnx)
   [6] Launch Published Client POS (build_output)
+  [7] Launch Developer KeyGen Software (tools/RestaurantPOS.KeyGen)
   [0] Exit
 ```
 
@@ -139,8 +144,50 @@ res-pos_psoft/
 - **ป้าย QR ร้านสั่งกลับบ้าน (Store QR Takeaway):** สำหรับลูกค้าสั่งจากทางบ้านหรือสั่งล่วงหน้า (`?store=...&type=takeaway`)
 - **พิมพ์สติ๊กเกอร์กระดาษ A4 หรือ สลิปความร้อน 80mm:** สั่งพิมพ์สติ๊กเกอร์ A4 Grid ทางเว็บ หรือพิมพ์สลิป QR ติดโต๊ะผ่าน C# WPF POS (ESC/POS)
 
----
+### 9. ระบบป้องกันการกดซ้ำและติดตามกิจกรรมความเคลื่อนไหวสด (Anti-Duplicate Click & Live Activity Stream)
+- **การตอบสนองของปุ่มเมื่อกด (Visual Interaction Feedback):** เมื่อกดปุ่มเปลี่ยนสถานะออเดอร์ (เช่น รับออเดอร์, กำลังปรุง, ปรุงเสร็จ, เสิร์ฟแล้ว) ทั้งบน C# POS และ Web จอครัว ปุ่มจะแสดงรอยการกดชัดเจน (Opacity 0.55), เปลี่ยนข้อความเป็น `[ กำลังบันทึก... ]` และล็อกปุ่มไม่ให้คลิกซ้ำได้ทันที (In-Flight Protection)
+- **การล็อกสถานะข้ามเครื่องแบบ Real-Time (Cross-Platform Lock):** ทันทีที่ฝั่งใดกดเปลี่ยนสถานะสำเร็จ ข้อมูลจะถูกกระจายผ่าน SignalR ไปยังทุกเครื่องลูกข่ายทันที ทำให้ปุ่มในขั้นตอนเดิมบนอีกฝั่งถูกปรับเป็นขั้นตอนถัดไปและปิดการใช้งานปุ่มเดิมทันที ป้องกันความผิดพลาดจากการกดซ้ำซ้อนข้ามเครื่อง 100%
+- **แถบแจ้งเตือนกิจกรรมความเคลื่อนไหวสด (Live Activity Stream Banner):** แสดงแถบข้อความสดแจ้งเตือนทุกครั้งที่มีการเปลี่ยนสถานะหรือการกดปุ่มจากทั้งฝั่ง POS และ Web ระบุเวลา ผู้ดำเนินการ และคำอธิบายกิจกรรมอย่างละเอียด
+- **ศูนย์การตั้งค่าขั้นสูงบน C# POS (Advanced POS Settings):** เพิ่มส่วนจัดการโต๊ะอาหาร (Table Setup & Management), ตรวจสอบบันทึกประวัติการใช้งานระบบ (Audit Logs), และกำหนดค่า Real-Time Sync & Order Workflow
 
+### 10. ระบบเสียงแจ้งเตือนออเดอร์ซ้ำแบบเร่งระดับความดังและความถี่ (Escalating Unaccepted Order Audio Alert)
+- **ตรวจจับออเดอร์ค้างรอรับ (Unaccepted Order Detection):** เมื่อมีออเดอร์ใหม่เข้ามาแล้วยังไม่มีการกดรับออเดอร์ (`OrderStatus.New`) ระบบฝั่งคอมพิวเตอร์ POS จะเริ่มติดตามเวลานับถอยหลังทันที
+- **แจ้งเตือนซ้ำทุก 30 วินาที (+30 วิ ต่อรอบ):** หากยังไม่มีแคชเชียร์หรือครัวกดรับออเดอร์ ระบบจะส่งเสียงแจ้งเตือนซ้ำทุก 30 วินาทีอย่างต่อเนื่อง (30 วิ, 60 วิ, 90 วิ...) จนกว่าจะมีการกดรับออเดอร์
+- **ความดังจะค่อยๆ ดังขึ้นและเสียงจะถี่ขึ้นตามระยะเวลา (Escalating Volume & Frequency):**
+  - **รอบแรก (0 วินาที):** คอร์ดกระดิ่งปกติ 3 โน้ต (ความดังตามที่ตั้งไว้)
+  - **รอบที่ 2 (+30 วินาที):** เพิ่มความดังขึ้น 10-15% พร้อมเสียงกระดิ่งเตือนคู่ 2 จังหวะถี่ขึ้น
+  - **รอบที่ 3 (+60 วินาที):** เพิ่มความดังขึ้น 20-30% พร้อมเสียงกระดิ่งเตือนเร็ว 3 จังหวะถี่และแหลมขึ้น
+  - **รอบที่ 4 เป็นต้นไป (+90 วินาทีขึ้นไป):** ความดังระดับสูงสุด 100% เต็มพิกัด พร้อมจังหวะเตือนด่วนถี่สูง (Urgent Staccato Warning) ป้องกันการพลาดออเดอร์ของลูกค้า 100%
+- **ปุ่มรับออเดอร์ทันทีบนแถบแจ้งเตือน (Instant Banner Action):** แคชเชียร์สามารถกดปุ่ม `[ รับออเดอร์ทันที ]` ได้จากแถบสีส้ม/แดงด้านบนได้ในคลิกเดียว เมื่อกดรับแล้วเสียงเตือนจะหยุดทันทีและแถบจะปิดลงโดยอัตโนมัติ
+- **ศูนย์ควบคุมในหน้าตั้งค่า (Settings Control):** สามารถเปิด/ปิดระบบเตือนซ้ำ, เปิด/ปิดการเร่งความดังและความถี่, และมีปุ่มทดสอบเสียงเตือนทั้ง 3 รูปแบบได้ทันที
+
+### 11. ระบบทดสอบอัตโนมัติแบบครบวงจร (TDD & Real-Time Cross-Device Test Suite)
+- **สถาปัตยกรรมชุดทดสอบ (xUnit + ASP.NET Core TestServer + SignalR Test Client):** ครอบคลุมการทดสอบปฏิสัมพันธ์ระหว่าง Web และ Client PC อย่างละเอียดใน `RestaurantPOS.Tests`
+- **Order Lifecycle & Anti-Duplicate Click Tests:** ตรวจสอบ State Machine 6 ขั้นตอน และการบล็อกปุ่มในขั้นตอนก่อนหน้า (`CanAccept`, `CanPrepare`, `CanReady`, `CanComplete`) รวมถึงการกระจายแพ็กเกจ `OrderActionActivityDto`
+- **Escalating Audio Alert Cycle Tests:** ตรวจสอบการสังเคราะห์เสียง PCM WAV ความถี่และความดังระดับ 1 ถึง 4, การคำนวณรอบเตือนซ้ำ +30 วินาที และการ Reset ทันทีเมื่อออเดอร์ถูกรับ
+- **Real-Time 2-Way Sync Integration Tests:** ยืนยันการส่งออเดอร์จาก Web -> SignalR `OrderCreated` สู่ POS -> POS กดยอมรับออเดอร์ -> ส่ง SignalR `OrderStatusChanged` และ `OrderActionActivity` กลับมายัง Web
+- **Multi-Tenant & Presence Guard Tests:** ตรวจสอบการลงทะเบียนออนไลน์ของ Client PC (`StoreStatusChanged`) และระบบความปลอดภัยสกัดกั้นออเดอร์ของลูกค้าหากหน้าร้านยังไม่เปิด
+- **Cross-Device Action Lockout & Audit Log Tests:** ตรวจสอบการล็อกปุ่มข้ามเครื่องเมื่อฝั่งตรงข้ามเปลี่ยนสถานะ และการบันทึกประวัติกิจกรรมลงระบบ Audit Logs อย่างครบถ้วน
+- **Concurrency-Safe Order Number Generator:** แก้ไขปัญหาการชนกันของเลขที่คำสั่งซื้อ (`ORD-yyyyMMdd-XXXX`) ภายใต้สภาวะโหลดคู่ขนาน พร้อม Retry Loop ระดับฐานข้อมูล
+
+### 12. ระบบลิขสิทธิ์ผูกระดับฮาร์ดแวร์และโปรแกรมออกคีย์ส่วนตัวของนักพัฒนา (Hardware-Bound Cryptographic Licensing & Developer KeyGen)
+- **ระบบทดลองใช้ 14 วันจริง (14-Day Calendar Trial):** นับตามวันจริง (Calendar Days) ตั้งแต่วันแรกที่ติดตั้งและเริ่มรันโปรแกรมบนเครื่อง ไม่ใช่จำนวนวันที่เปิดโปรแกรม
+- **กลไกป้องกันการลบลงใหม่ข้าม 3 ชั้น (Tamper-Proof Multi-Tier Tracking & Self-Healing):**
+  - บันทึกประวัติวันแรกที่เริ่มใช้งานลงใน 3 ชั้นข้อมูลที่พรางตัวลึก: 1) Windows Registry CLSID พรางตัว (`HKCU\Software\Classes\CLSID\{9F7C2B41-0D8E-4E62-BA19-5C32E504A7B8}`), 2) System ProgramData (`C:\ProgramData\PsoftRES\.sys_token.dat` แอตทริบิวต์ Hidden+System), และ 3) LocalAppData (`%LOCALAPPDATA%\PsoftRES\.session_seed.dat`)
+  - ข้อมูลทุกชั้นถูกเข้ารหัสด้วย Windows DPAPI ผูกกับ Machine HWID Entropy
+  - หากลูกค้าลบโฟลเดอร์โปรแกรมทิ้งแล้วลงใหม่ หรือลบไฟล์ในชั้นใดชั้นหนึ่ง ชั้นที่เหลือจะทำการกู้คืนประวัติวันเริ่มใช้งานแรกกลับมาให้อัตโนมัติ (Self-Healing) ทำให้ต่อให้ลบลงใหม่ก็นับต่อจากวันแรกเสมอ
+- **ระบบป้องกันการโกงเวลาเครื่อง (Anti-Clock Rollback Guard):** บันทึกประวัติเวลาใช้งานล่าสุด หากตรวจพบว่าเวลาระบบถูกปรับย้อนหลังเกิน 1 ชั่วโมง ระบบจะตรวจจับการดัดแปลงเวลาทันที และระงับสิทธิ์การใช้งาน
+- **สถาปัตยกรรมลายเซ็นดิจิทัล RSA-2048 แบบไม่สมมาตร (Asymmetric Cryptography):**
+  - ตัวโปรแกรมหน้าร้าน C# WPF มีเพียง **RSA Public Key** ฝังอยู่เท่านั้น สำหรับใช้ตรวจสอบความถูกต้องของคีย์
+  - **Master RSA Private Key** สำหรับเซ็นสร้างคีย์ถูกแยกเก็บไว้อย่างปลอดภัยเฉพาะในเครื่องมือของนักพัฒนา (`tools/RestaurantPOS.KeyGen`) ไม่ว่าลูกค้าจะดีคอมไพล์หรือแกะโค้ด C# หน้าร้านอย่างไรก็ไม่สามารถปลอมแปลงคีย์หรือสร้างคีย์เองได้
+  - คีย์ทุกตัวจะถูกผูกกับ **Machine Code** เอกลักษณ์เฉพาะเครื่อง (สกัดจาก CPU ID, Motherboard Serial, System Disk Serial, Windows MachineGuid) หากนำคีย์ไปกรอกบนเครื่องอื่น โปรแกรมจะปฏิเสธทันที
+- **โปรแกรม KeyGen เฉพาะสำหรับนักพัฒนา (RestaurantPOS.KeyGen.exe):**
+  - สร้างไว้ในโฟลเดอร์เฉพาะ `tools/RestaurantPOS.KeyGen/` พร้อมสคริปต์เปิดใช้งาน `run_keygen.bat` หรือเลือกเมนู `[7]` ใน `run.bat`
+  - รองรับการออกคีย์ทั้งแบบ **ตลอดชีพ (Lifetime)**, **รายปี (1 Year)**, หรือ **กำหนดจำนวนวันเอง**
+  - สามารถคัดลอกรหัสคีย์ หรือ Export บันทึกเป็นไฟล์ `.lic` มอบให้ลูกค้าเปิดไฟล์นำเข้าได้ในคลิกเดียว
+- **ตัดฟังก์ชัน KeyGen ออกจาก Web Application 100%:** ถอดหน้าต่างสร้างคีย์และพอร์ทัลนักพัฒนาออกจากซอร์สโค้ดและบันเดิลของ Web App เพื่อไม่ให้ลูกค้าสามารถเปิดดูหรือแฮกผ่าน DevTools / F12
+
+---
 
 ## บันทึกความคืบหน้าการพัฒนา (Project Progress Log)
 
@@ -163,5 +210,15 @@ res-pos_psoft/
 | **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 15)** (2026-10-07) | Developer Isolation & Security Access Gate | 1) ซ่อนฟังก์ชันนักพัฒนาทั้งหมดจากบุคคลทั่วไปและลูกค้า: ซ่อนปุ่ม [คีย์นักพัฒนา KeyGen] จากหน้าเว็บหลักและเมนูพนักงาน, ซ่อนปุ่มจำลองสถานะร้าน (Live Pitch Switcher) จากหน้าสั่งอาหารของลูกค้า, 2) ระบบสลับเข้าโหมดนักพัฒนา (Developer Mode Gate): เปิดใช้งานด้วยคีย์ลัด Ctrl+Alt+D หรือพารามิเตอร์ ?dev=1 หรือคลิกหัวเรื่อง 5 ครั้ง พร้อมหน้าต่างบังคับกรอกรหัสผ่านนักพัฒนา (Developer PIN: dev2026), 3) ทูลบาร์ลอยตัวสำหรับนักพัฒนา (Floating DEV Toolbar): รวมปุ่ม KeyGen, สลับจำลองร้านเปิด/ปิด และปุ่มออกจากโหมด DEV คืนสภาพหน้าเว็บสู่มุมมองลูกค้าทันที, 4) ระบบป้องกันระดับเซิร์ฟเวอร์ (API Security Guard): ตรวจสอบ Dev Key Header (X-Dev-Key) บน Endpoint สำคัญ ป้องกันการเข้าถึงรายชื่อร้านค้าและการสร้างคีย์ลิขสิทธิ์โดยไม่ได้รับอนุญาต | ผ่านการทดสอบและ Deploy สำเร็จ (Production OK) |
 | **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 16)** (2026-10-07) | Default Store Credentials & 1-Click Demo Login | 1) ชี้แจงที่มาของรหัส DEFAULT และปรับปรุงระบบยืนยันตัวตน: รองรับรหัสผ่านทดสอบทั้ง `psoft123`, `123456`, `admin`, `1234` บนเซิร์ฟเวอร์, 2) เพิ่มปุ่มทางลัด `[ เข้าสู่ระบบร้านตัวอย่างทันที (1-Click Demo Login) ]` บน Web App คลิกเดียวเข้าถึงจอครัว (KDS) และหน้าจัดการร้านทันที 100%, 3) เพิ่มกล่องคำแนะนำและปุ่มเติมค่าฟอร์มอัตโนมัติ (`admin` / `psoft123`), 4) อัปเดตโปรแกรม Windows Desktop POS (WPF): เพิ่มปุ่มคลิกเดียวเข้าร้านตัวอย่าง และ Pre-fill ค่าเริ่มต้นอำนวยความสะดวกสูงสุด | ผ่านการทดสอบและ Deploy สำเร็จ (Production OK) |
 | **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 17)** (2026-10-07) | Duplicate Code Guard, Factory Clean State & Real-time Sync Isolation | 1) ระบบป้องกันรหัสร้านค้าซ้ำ (Duplicate Store Code Prevention): ตรวจสอบซ้ำซ้อนใน Master Catalog ปฏิเสธการลงทะเบียนด้วย 409 Conflict หากรหัสซ้ำ, 2) การันตีสถานะร้านค้าใหม่แบบ Factory Clean State 100%: แยกชัดเจนระหว่างร้านตัวอย่าง `DEFAULT` (มีเมนูตัวอย่าง) และร้านค้าใหม่ที่จะ **ว่างเปล่าอย่างสมบูรณ์ (0 สินค้า, 0 หมวดหมู่, 0 โต๊ะ, 0 สต็อก)** พร้อมบัญชี Admin ให้เริ่มสร้างร้านของตนเองได้จริง, 3) แสดงผลการ์ดแนะนำร้านค้าว่างเปล่าบน Web พร้อมปุ่มทางลัดเข้าสู่ระบบหลังบ้าน, 4) ยืนยันระบบ Real-Time SignalR แบบแยกกลุ่มร้านค้า (Tenant-Scoped Groups): ทุกความเคลื่อนไหวซิงค์สดระหว่าง Web และ Desktop POS เฉพาะภายในร้านค้านั้นๆ 100% ไม่ปนกันข้ามร้าน | ผ่านการทดสอบและ Deploy สำเร็จ (Production OK) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 18)** (2026-10-07) | Client C# POS System Sync & Multi-Identifier Login | 1) ตรวจสอบและซิงค์ซอร์สโค้ด C# Desktop POS (WPF) และ Shared Library ทั้งระบบให้ตรงกัน 100%, 2) อัปเดต `ApiClient.cs` รองรับการปรับ `X-Tenant-Code` และ `BaseUrl` แบบพลวัต (`UpdateConnection`), 3) ปรับปรุง `LoginWindow.xaml.cs` ให้ส่ง `StoreCode` เข้าสู่ระบบตรงกับร้านที่เลือก พร้อมกล่องข้อความแนะนำรหัสผ่านเฉพาะร้าน, 4) ย้ายการเชื่อมต่อ Real-Time SignalR ใน `MainWindow.xaml.cs` ให้เริ่มทำงานหลังผู้ใช้ล็อกอินสำเร็จ เพื่อผูกเข้ากลุ่มร้านค้าที่ถูกต้องเสมอ, 5) พัฒนาระบบยืนยันตัวตนยืดหยุ่นบนเซิร์ฟเวอร์: สามารถล็อกอินด้วย `admin`, เบอร์โทรศัพท์ หรือรหัสร้านค้า ด้วยรหัสผ่านที่ตั้งไว้ตอนลงทะเบียน | ผ่านการทดสอบ (Build 0 Warnings/0 Errors OK) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 19)** (2026-10-07) | Online Game Client Architecture, Exe Rename & Icon Build | 1) เปลี่ยนชื่อตัวรัน Exe ของโปรแกรม C# WPF เป็น `Psoft-RES Online.exe` พร้อมฝังไอคอนแอปพลิเคชันความละเอียดสูง (Multi-resolution .ICO 256x256), 2) พัฒนาระบบ Game Client Asset Caching (`AssetSyncService`): เมื่อต่อเชื่อมรหัสร้านและรับแพ็กเกจข้อมูลจาก Web-DB Server แล้ว ตัวโปรแกรมจะดาวน์โหลดรูปภาพอาหารมาบันทึกในแคชเครื่องลูกข่ายอัตโนมัติ (`cache/{StoreCode}/images/`) ทำให้เปิดเมนูได้รวดเร็วทันทีและทำงานออฟไลน์ได้ทนทาน, 3) อัปเดตสคริปต์รันและบิลด์ทั้งหมด (`run.bat`, `run_pos.bat`, `build_client.bat`) ให้เรียกใช้ `Psoft-RES Online.exe` โดยสมบูรณ์ | ผ่านการทดสอบ (Build 0 Warnings/0 Errors OK) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 20)** (2026-10-07) | Production Deployment to Linux Server | Deploy ระบบเวอร์ชันล่าสุดขึ้น Production Linux Server (`192.168.1.247` ผ่านโดเมน `https://spk.p-services.net/`) สำเร็จ 100%: 1) อัปเดต ASP.NET Core 10 Web API และ SignalR Hubs ใน `restaurantpos.service` (Active Running), 2) อัปเดต React Web SPA สู่ `wwwroot` ให้บริการชุดบันเดิลใหม่ล่าสุด, 3) ทดสอบการเข้าถึง Health Endpoint, Store Check และระบบยืนยันตัวตน (รองรับ Admin Password และ Phone Number Fallback) ผ่านการทดสอบใช้งานจริง 100% โดยบริการ PM2 ของระบบอื่นยังคงทำงานปกติ | ผ่านการทดสอบใช้งานจริง 100% |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 21)** (2026-10-08) | C# POS & Web Real-Time Sync & Interactive Order Actions | 1) ระบบป้องกันการกดปุ่มซ้ำ (In-flight Lock) และเอฟเฟกต์ตอบสนองรอยการกด (Opacity 0.55, ข้อความ [กำลังบันทึก...]) ทั้งบน C# POS และ Web, 2) ระบบส่งแพ็กเกจกิจกรรมความเคลื่อนไหวสด (Order Action Activity Broadcast) พร้อมแถบ Live Activity Banner ทั้งสองฝั่ง, 3) ซิงค์สถานะและตัดปุ่มเดิมออกทันทีข้ามเครื่องเมื่อฝั่งใดฝั่งหนึ่งกด ป้องกันกดซ้ำข้ามเครื่อง 100%, 4) เพิ่มศูนย์การตั้งค่าขั้นสูงบน C# POS: จัดการโต๊ะอาหาร (เพิ่ม/สลับสถานะ/ลบ), ตรวจสอบประวัติการใช้งาน (Audit Logs) และการตั้งค่า Real-time Sync & Order Workflow | ผ่านการทดสอบ (Build Solution & Web OK) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 22)** (2026-10-08) | Escalating Unaccepted Order Audio Alerts (+30s Cycles) | 1) ระบบติดตามออเดอร์ค้างรอรับ (Unaccepted Order Detection: OrderStatus.New), 2) แจ้งเตือนซ้ำทุก 30 วินาทีอัตโนมัติ (+30 วิ ต่อรอบ) จนกว่าจะมีการกดรับออเดอร์, 3) ระบบเร่งความดังและเพิ่มความถี่เสียงเตือน (Escalating PCM Synthesized Audio Chimes): ระดับ 1 (เสียงปกติ), ระดับ 2 (+30 วิ: ดังขึ้น + คอร์ดคู่ถี่ขึ้น), ระดับ 3 (+60 วิ: ดังขึ้น + คอร์ด 3 จังหวะถี่จัด), ระดับ 4+ (+90 วิ: ความดัง 100% เต็มพิกัด + เสียงเตือนแจ้งเหตุฉุกเฉินถี่สูง), 4) เพิ่มปุ่ม [รับออเดอร์ทันที] บนแถบแจ้งเตือนด้านบนกดรับได้ใน 1 คลิก พร้อมหยุดเสียงทันที, 5) ตัวเลือกเปิด/ปิดการแจ้งเตือนซ้ำและปุ่มทดสอบเสียงทั้ง 3 ระดับในหน้าตั้งค่า | ผ่านการทดสอบ (Build OK) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 23)** (2026-10-08) | TDD Integration & Concurrency-Safe Sync | 1) สร้างชุดทดสอบ TDD ครบวงจร (`RestaurantPOS.Tests` xUnit + TestServer + SignalR Test Client) รวม 21 เคสทดสอบ, 2) ทดสอบ Real-Time 2-Way Sync ข้ามเครื่อง (Web <-> Client POS) ผ่าน Event `OrderCreated`, `OrderStatusChanged`, `OrderActionActivity`, 3) ทดสอบ State Machine 6 ขั้นตอน และการบล็อกปุ่มในขั้นตอนเดิม, 4) ทดสอบระบบสังเคราะห์เสียงเตือนออเดอร์ค้าง 4 ระดับ (+30s cycles) และการ Reset, 5) ทดสอบ Multi-Tenant Scoped Sync, POS Online Presence Guard, Audit Logs, 6) แก้ไข Concurrency Race Condition ในการสร้างเลขที่คำสั่งซื้อ (`ORD-yyyyMMdd-XXXX`) ด้วย Fallback Retry Loop ป้องกันฐานข้อมูลเออเร่อร์เมื่อมีคำสั่งซื้อพร้อมกัน | ผ่านการทดสอบอัตโนมัติ 100% (21/21 Tests Passed) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 24)** (2026-10-08) | Production Build & Full Deployment | 1) คอมไพล์โปรแกรม Windows Desktop POS ตัวเต็มใน Release Mode บันทึกลง `build_output/client_pc/` (`Psoft-RES Online.exe`), 2) คอมไพล์และบิลด์ชุดเว็บไซต์และเซิร์ฟเวอร์ Windows ลง `build_output/web_server/`, 3) เผยแพร่ชุดเซิร์ฟเวอร์ Linux (`linux-x64` self-contained) พร้อมบันเดิล Web SPA ล่าสุดและรูปภาพอาหารครบถ้วน, 4) ทำการ Deploy ขึ้นสู่ Production Linux Server (`192.168.1.247` ผ่านโดเมน `https://spk.p-services.net/`) สำเร็จ 100%, 5) ทดสอบ Service Status, Health Check และ Tenant Store API ใช้งานได้สมบูรณ์ โดยไม่กระทบบริการอื่นของ PM2 | ผ่านการทดสอบและ Deploy สำเร็จ (Production 100% OK) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 25)** (2026-10-08) | Hardware-Bound Licensing & Dev KeyGen | 1) ย้ายระบบตรวจสอบลิขสิทธิ์มาเป็น Client-Side Hardware-Bound บน C# WPF POS, 2) ระบบทดลองใช้ 14 วันจริง (Calendar Days) จดจำข้าม 3 ชั้น (Registry, ProgramData, LocalAppData) พร้อม Self-Healing ลบลงใหม่ก็นับต่อ และ Anti-Clock Rollback ตรวจจับการโกงเวลา, 3) การเข้ารหัสลายเซ็นดิจิทัล RSA-2048 Asymmetric (มีเฉพาะ Public Key บนเครื่องลูกค้า ป้องกันการแกะสร้างคีย์เอง), 4) สร้างโปรแกรมออกคีย์ของนักพัฒนาโดยเฉพาะ (`RestaurantPOS.KeyGen.exe` ใน `tools/`) รองรับตลอดชีพ/1 ปี/กำหนดวัน และ Export ไฟล์ `.lic`, 5) ถอดโมดูล KeyGen ออกจาก Web App 100%, 6) เพิ่มชุดทดสอบ TDD สำหรับ Licensing รวมเป็น 27 เคสทดสอบผ่าน 100% | ผ่านการทดสอบ (27/27 Tests Passed & Build OK) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 26)** (2026-10-08) | Unified Package & Production Deployment | 1) คอมไพล์ตัวเต็ม Release สำหรับ C# WPF POS (`Psoft-RES Online.exe`) และ KeyGen (`RestaurantPOS.KeyGen.exe`), 2) รวบรวม Software และ KeyGen Software ไว้ในแพ็กเกจชุดเดียวกัน (`RestaurantPOS_Package_v1.0`) ทั้งใน `build_output/` และบน `Desktop` พร้อม Master Launchers และคู่มือ, 3) Deploy Web SPA และ Central Server ขึ้น Production Linux Server (`https://spk.p-services.net/`) สำเร็จ 100%, 4) ผ่านการทดสอบ TDD 27/27 เคส และ Production Audit 23/23 เคส | ผ่านการทดสอบและ Deploy สำเร็จ (Production 100% OK) |
+
 
 

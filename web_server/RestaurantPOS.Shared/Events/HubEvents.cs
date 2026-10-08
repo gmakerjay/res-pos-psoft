@@ -17,6 +17,7 @@ public static class HubEvents
     public const string CategoryUpdated = "CategoryUpdated";
     public const string SystemNotification = "SystemNotification";
     public const string StoreStatusChanged = "StoreStatusChanged";
+    public const string OrderActionActivity = "OrderActionActivity";
 
     // Client-to-Server methods
     public const string JoinTableGroup = "JoinTableGroup";
@@ -24,4 +25,5 @@ public static class HubEvents
     public const string JoinRoleGroup = "JoinRoleGroup";
     public const string RegisterPos = "RegisterPos";
     public const string UnregisterPos = "UnregisterPos";
+    public const string NotifyOrderAction = "NotifyOrderAction";
 }

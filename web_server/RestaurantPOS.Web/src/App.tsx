@@ -23,7 +23,6 @@ import {
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SoftwareLandingView } from './components/SoftwareLandingView';
 import { TableQrManagerModal } from './components/TableQrManagerModal';
-import { DeveloperLicensePortalModal } from './components/DeveloperLicensePortalModal';
 import { ActivateLicenseModal } from './components/ActivateLicenseModal';
 
 // Initialize global logger error handlers
@@ -49,7 +48,6 @@ export function App() {
     const p = new URLSearchParams(window.location.search);
     return p.get('view') === 'qr' || p.get('qr') === '1';
   });
-  const [showDeveloperLicenseModal, setShowDeveloperLicenseModal] = useState<boolean>(false);
   const [showActivateLicenseModal, setShowActivateLicenseModal] = useState<boolean>(false);
 
   // Developer Mode States & Access Control
@@ -274,26 +272,6 @@ export function App() {
               >
                 [ ดูตัวอย่างระบบจริง (Live Demo) ]
               </button>
-
-              {isDevMode && (
-                <button
-                  onClick={() => setShowDeveloperLicenseModal(true)}
-                  style={{
-                    backgroundColor: 'rgba(255,255,255,0.15)',
-                    color: '#FFD54F',
-                    border: '1px solid rgba(255,255,255,0.4)',
-                    padding: '5px 10px',
-                    borderRadius: '4px',
-                    fontSize: '11.5px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                  title="ศูนย์จัดการคีย์และสิทธิ์ร้านค้าทั้งหมด (SuperAdmin)"
-                >
-                  [คีย์นักพัฒนา KeyGen]
-                </button>
-              )}
 
               <button
                 onClick={() => {
@@ -563,25 +541,6 @@ export function App() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              {isDevMode && (
-                <button
-                  onClick={() => setShowDeveloperLicenseModal(true)}
-                  style={{
-                    backgroundColor: 'rgba(255,255,255,0.15)',
-                    color: '#FFD54F',
-                    border: '1px solid rgba(255,255,255,0.3)',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                  title="ศูนย์จัดการคีย์และสิทธิ์ร้านค้าทั้งหมด (SuperAdmin)"
-                >
-                  [คีย์นักพัฒนา KeyGen]
-                </button>
-              )}
               <span style={{ fontSize: '12px', backgroundColor: 'rgba(255,255,255,0.2)', padding: '3px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
                 {currentUser.fullName}
               </span>
@@ -823,14 +782,6 @@ export function App() {
           />
         )}
 
-        {/* Developer License Portal Modal */}
-        {showDeveloperLicenseModal && (
-          <DeveloperLicensePortalModal
-            isOpen={showDeveloperLicenseModal}
-            onClose={() => setShowDeveloperLicenseModal(false)}
-          />
-        )}
-
         {/* Activate License Modal */}
         {showActivateLicenseModal && (
           <ActivateLicenseModal
@@ -877,24 +828,6 @@ export function App() {
                 โหมดนักพัฒนา
               </span>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setShowDeveloperLicenseModal(true)}
-              style={{
-                backgroundColor: '#1E293B',
-                color: '#38BDF8',
-                border: '1px solid #38BDF8',
-                padding: '4px 10px',
-                borderRadius: '4px',
-                fontSize: '11.5px',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-              title="เปิดศูนย์จัดการคีย์และสิทธิ์ร้านค้าทั้งหมด"
-            >
-              [ คีย์ KeyGen ]
-            </button>
 
             <button
               type="button"
@@ -3023,6 +2956,8 @@ function CustomerView({
 // -------------------------------------------------------------
 function KitchenView() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [processingOrderIds, setProcessingOrderIds] = useState<Set<number>>(new Set());
+  const [lastActionActivity, setLastActionActivity] = useState<string | null>(null);
 
   useEffect(() => {
     loadActiveOrders();
@@ -3041,10 +2976,18 @@ function KitchenView() {
       loadActiveOrders();
     });
 
+    const unsubAction = realtimeService.onOrderActionActivity((act) => {
+      setLastActionActivity(act.actionDescription);
+      setTimeout(() => {
+        setLastActionActivity(prev => prev === act.actionDescription ? null : prev);
+      }, 7000);
+    });
+
     return () => {
       unsubNew();
       unsubStatus();
       unsubBill();
+      unsubAction();
     };
   }, []);
 
@@ -3058,23 +3001,76 @@ function KitchenView() {
   };
 
   const handleUpdateStatus = async (orderId: number, newStatus: number) => {
+    if (processingOrderIds.has(orderId)) return;
+
+    setProcessingOrderIds(prev => new Set(prev).add(orderId));
     try {
-      await updateOrderStatus(orderId, newStatus);
+      const user = getStoredUser();
+      const operator = user?.fullName || user?.username || 'ฝ่ายครัว (Web)';
+      await updateOrderStatus(orderId, newStatus, operator, 'WEB_KITCHEN');
       await loadActiveOrders();
     } catch (err: any) {
       alert('เกิดข้อผิดพลาดในการอัปเดตสถานะ: ' + err.message);
+    } finally {
+      setProcessingOrderIds(prev => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
     }
   };
 
   return (
     <div>
+      {/* Live Real-time Activity Banner (from POS & Web) */}
+      {lastActionActivity && (
+        <div style={{
+          backgroundColor: '#1E3A8A',
+          color: '#FFF',
+          padding: '8px 14px',
+          borderRadius: '6px',
+          marginBottom: '14px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '13px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <div>
+            <span style={{ 
+              backgroundColor: '#3B82F6', 
+              padding: '2px 8px', 
+              borderRadius: '4px', 
+              fontWeight: 'bold', 
+              fontSize: '11px',
+              marginRight: '8px'
+            }}>
+              [ความเคลื่อนไหว Real-time]
+            </span>
+            <span>{lastActionActivity}</span>
+          </div>
+          <button 
+            onClick={() => setLastActionActivity(null)}
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              color: '#93C5FD', 
+              cursor: 'pointer', 
+              fontWeight: 'bold' 
+            }}
+          >
+            [X] ปิด
+          </button>
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
           <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>
             จอแสดงผลรายการอาหารสำหรับห้องครัว (Kitchen Display)
           </h2>
           <p style={{ fontSize: '12px', color: '#666' }}>
-            ระบบจะส่งเสียงเตือนเมื่อมีออเดอร์ใหม่เข้ามาแบบ Real-time
+            ระบบจะส่งเสียงเตือนและอัปเดตสถานะเชื่อมต่อ Real-time สองทางกับเครื่องแคชเชียร์ POS หน้าร้าน
           </p>
         </div>
         <button
@@ -3084,7 +3080,8 @@ function KitchenView() {
             border: '1px solid #CCC',
             padding: '6px 14px',
             borderRadius: '4px',
-            fontWeight: 600
+            fontWeight: 600,
+            cursor: 'pointer'
           }}
         >
           รีเฟรช
@@ -3109,160 +3106,187 @@ function KitchenView() {
             [ ยังไม่มีรายการออเดอร์ที่รอดำเนินการ ]
           </div>
         ) : (
-          orders.map(order => (
-            <div
-              key={order.id}
-              style={{
-                backgroundColor: '#FFF',
-                borderRadius: '8px',
-                padding: '16px',
-                boxShadow: 'var(--shadow)',
-                borderTop: `5px solid ${order.status === 1 ? '#D32F2F' : (order.status === 2 ? '#1976D2' : (order.status === 3 ? '#F57C00' : '#388E3C'))}`
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div>
-                  <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
-                    โต๊ะ: {order.tableNumber || 'สั่งกลับบ้าน'}
-                  </span>
-                  <div style={{ fontSize: '11px', color: '#666' }}>
-                    บิล: {order.orderNumber}
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
-                    <span style={{ fontSize: '12.5px', color: '#1E293B', fontWeight: 'bold' }}>
-                      ลูกค้า: {order.customerName || 'ลูกค้าทั่วไป'}
+          orders.map(order => {
+            const isProcessing = processingOrderIds.has(order.id);
+            return (
+              <div
+                key={order.id}
+                style={{
+                  backgroundColor: '#FFF',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  boxShadow: 'var(--shadow)',
+                  borderTop: `5px solid ${order.status === 1 ? '#D32F2F' : (order.status === 2 ? '#1976D2' : (order.status === 3 ? '#F57C00' : '#388E3C'))}`
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <div>
+                    <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                      โต๊ะ: {order.tableNumber || 'สั่งกลับบ้าน'}
                     </span>
-                    {order.customerPhone ? (
-                      <span style={{ 
-                        fontSize: '12.5px', 
-                        color: '#1D4ED8', 
-                        fontWeight: 'bold',
-                        backgroundColor: '#DBEAFE',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        border: '1px solid #93C5FD'
-                      }}>
-                        โทร: {order.customerPhone}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '11px', color: '#94A3B8' }}>[ไม่ระบุเบอร์โทร]</span>
-                    )}
-                  </div>
-                </div>
-                <span style={{
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  backgroundColor: '#F0F0F0'
-                }}>
-                  {getStatusText(order.status)}
-                </span>
-              </div>
-
-              {order.notes && (
-                <div style={{
-                  backgroundColor: '#FFF9C4',
-                  border: '1px solid #FFF59D',
-                  padding: '6px 10px',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  color: '#795548',
-                  marginBottom: '10px',
-                  fontWeight: 'bold'
-                }}>
-                  หมายเหตุของโต๊ะ: {order.notes}
-                </div>
-              )}
-
-              <div style={{ borderTop: '1px dashed #DDD', paddingTop: '10px', marginBottom: '14px' }}>
-                {order.items.map((item, idx) => (
-                  <div key={idx} style={{ marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px' }}>
-                      <span>{item.quantity}x {item.productName}</span>
+                    <div style={{ fontSize: '11px', color: '#666' }}>
+                      บิล: {order.orderNumber}
                     </div>
-                    {item.specialNotes && (
-                      <div style={{ fontSize: '12px', color: '#D32F2F', fontWeight: 'bold', paddingLeft: '12px' }}>
-                        * {item.specialNotes}
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                      <span style={{ fontSize: '12.5px', color: '#1E293B', fontWeight: 'bold' }}>
+                        ลูกค้า: {order.customerName || 'ลูกค้าทั่วไป'}
+                      </span>
+                      {order.customerPhone ? (
+                        <span style={{ 
+                          fontSize: '12.5px', 
+                          color: '#1D4ED8', 
+                          fontWeight: 'bold',
+                          backgroundColor: '#DBEAFE',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          border: '1px solid #93C5FD'
+                        }}>
+                          โทร: {order.customerPhone}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: '#94A3B8' }}>[ไม่ระบุเบอร์โทร]</span>
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    backgroundColor: '#F0F0F0'
+                  }}>
+                    {getStatusText(order.status)}
+                  </span>
+                </div>
 
-              {/* Action buttons */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {order.status === 1 && (
-                  <button
-                    onClick={() => handleUpdateStatus(order.id, 2)}
-                    style={{
-                      flex: 1,
-                      backgroundColor: '#1976D2',
-                      color: '#FFF',
-                      border: 'none',
-                      padding: '8px',
-                      borderRadius: '4px',
-                      fontWeight: 'bold',
-                      fontSize: '13px'
-                    }}
-                  >
-                    รับออเดอร์
-                  </button>
+                {order.notes && (
+                  <div style={{
+                    backgroundColor: '#FFF9C4',
+                    border: '1px solid #FFF59D',
+                    padding: '6px 10px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    color: '#795548',
+                    marginBottom: '10px',
+                    fontWeight: 'bold'
+                  }}>
+                    หมายเหตุของโต๊ะ: {order.notes}
+                  </div>
                 )}
-                {order.status === 2 && (
-                  <button
-                    onClick={() => handleUpdateStatus(order.id, 3)}
-                    style={{
-                      flex: 1,
-                      backgroundColor: '#F57C00',
-                      color: '#FFF',
-                      border: 'none',
-                      padding: '8px',
-                      borderRadius: '4px',
-                      fontWeight: 'bold',
-                      fontSize: '13px'
-                    }}
-                  >
-                    เริ่มปรุง
-                  </button>
-                )}
-                {order.status === 3 && (
-                  <button
-                    onClick={() => handleUpdateStatus(order.id, 4)}
-                    style={{
-                      flex: 1,
-                      backgroundColor: '#388E3C',
-                      color: '#FFF',
-                      border: 'none',
-                      padding: '8px',
-                      borderRadius: '4px',
-                      fontWeight: 'bold',
-                      fontSize: '13px'
-                    }}
-                  >
-                    ปรุงเสร็จพร้อมเสิร์ฟ
-                  </button>
-                )}
-                {order.status === 4 && (
-                  <button
-                    onClick={() => handleUpdateStatus(order.id, 5)}
-                    style={{
-                      flex: 1,
-                      backgroundColor: '#455A64',
-                      color: '#FFF',
-                      border: 'none',
-                      padding: '8px',
-                      borderRadius: '4px',
-                      fontWeight: 'bold',
-                      fontSize: '13px'
-                    }}
-                  >
-                    เสิร์ฟเรียบร้อย
-                  </button>
-                )}
+
+                <div style={{ borderTop: '1px dashed #DDD', paddingTop: '10px', marginBottom: '14px' }}>
+                  {order.items.map((item, idx) => (
+                    <div key={idx} style={{ marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px' }}>
+                        <span>{item.quantity}x {item.productName}</span>
+                      </div>
+                      {item.specialNotes && (
+                        <div style={{ fontSize: '12px', color: '#D32F2F', fontWeight: 'bold', paddingLeft: '12px' }}>
+                          * {item.specialNotes}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Action buttons with Duplicate Click Prevention and Interaction Feedback */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {order.status === 1 && (
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 2)}
+                      disabled={isProcessing}
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#1976D2',
+                        color: '#FFF',
+                        border: 'none',
+                        padding: '8px',
+                        borderRadius: '4px',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        cursor: isProcessing ? 'not-allowed' : 'pointer',
+                        opacity: isProcessing ? 0.55 : 1,
+                        filter: isProcessing ? 'grayscale(40%)' : 'none',
+                        transform: isProcessing ? 'scale(0.98)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {isProcessing ? '[ กำลังบันทึก... ]' : 'รับออเดอร์'}
+                    </button>
+                  )}
+                  {order.status === 2 && (
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 3)}
+                      disabled={isProcessing}
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#F57C00',
+                        color: '#FFF',
+                        border: 'none',
+                        padding: '8px',
+                        borderRadius: '4px',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        cursor: isProcessing ? 'not-allowed' : 'pointer',
+                        opacity: isProcessing ? 0.55 : 1,
+                        filter: isProcessing ? 'grayscale(40%)' : 'none',
+                        transform: isProcessing ? 'scale(0.98)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {isProcessing ? '[ กำลังบันทึก... ]' : 'เริ่มปรุง'}
+                    </button>
+                  )}
+                  {order.status === 3 && (
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 4)}
+                      disabled={isProcessing}
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#388E3C',
+                        color: '#FFF',
+                        border: 'none',
+                        padding: '8px',
+                        borderRadius: '4px',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        cursor: isProcessing ? 'not-allowed' : 'pointer',
+                        opacity: isProcessing ? 0.55 : 1,
+                        filter: isProcessing ? 'grayscale(40%)' : 'none',
+                        transform: isProcessing ? 'scale(0.98)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {isProcessing ? '[ กำลังบันทึก... ]' : 'ปรุงเสร็จพร้อมเสิร์ฟ'}
+                    </button>
+                  )}
+                  {order.status === 4 && (
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 5)}
+                      disabled={isProcessing}
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#455A64',
+                        color: '#FFF',
+                        border: 'none',
+                        padding: '8px',
+                        borderRadius: '4px',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        cursor: isProcessing ? 'not-allowed' : 'pointer',
+                        opacity: isProcessing ? 0.55 : 1,
+                        filter: isProcessing ? 'grayscale(40%)' : 'none',
+                        transform: isProcessing ? 'scale(0.98)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {isProcessing ? '[ กำลังบันทึก... ]' : 'เสิร์ฟเรียบร้อย'}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -5258,10 +5282,9 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
     setIsLoggingIn(true);
     setErrorMsg('');
     try {
-      if (storeCode.trim()) {
-        setStoredTenantCode(storeCode.trim().toUpperCase());
-      }
-      const res = await login(username.trim(), password.trim());
+      const targetStore = storeCode.trim().toUpperCase() || 'DEFAULT';
+      setStoredTenantCode(targetStore);
+      const res = await login(username.trim(), password.trim(), targetStore);
       onSuccess(res.user);
     } catch (err: any) {
       setErrorMsg(err.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
@@ -5416,7 +5439,7 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
               style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #CCC', fontSize: '14px' }}
             />
             <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>
-              * ชื่อผู้ดูแลระบบร้านตัวอย่างคือ <strong>admin</strong>
+              * ชื่อผู้ใช้งานเริ่มต้นคือ <strong>admin</strong> (หรือกรอกเบอร์โทรศัพท์ที่ลงทะเบียนไว้)
             </div>
           </div>
 
