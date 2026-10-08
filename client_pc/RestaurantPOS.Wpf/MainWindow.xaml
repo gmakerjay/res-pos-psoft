@@ -126,41 +126,50 @@
 
         <!-- 0. Top App Header (Classic XP Theme with High Visibility) -->
         <Border Grid.Row="0" Background="#245EDC" BorderBrush="#163E9B" BorderThickness="0,0,0,2">
-            <DockPanel Margin="16,0">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="#1C4BB3" Padding="10,5" CornerRadius="4" Margin="0,0,14,0">
-                        <TextBlock Text="Psoft-RES Online" FontWeight="Bold" FontSize="17" Foreground="White"/>
+            <Grid Margin="12,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left Section: App Title, Store Badge & License Status -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#1C4BB3" Padding="8,4" CornerRadius="4" Margin="0,0,8,0">
+                        <TextBlock Text="Psoft-RES Online" FontWeight="Bold" FontSize="15" Foreground="White" VerticalAlignment="Center"/>
                     </Border>
-                    <Border Background="#0D47A1" Padding="8,4" CornerRadius="4" VerticalAlignment="Center">
-                        <TextBlock x:Name="TxtStoreBadge" Text="[ร้าน: DEFAULT]" FontWeight="Bold" FontSize="13" Foreground="#FFEB3B" VerticalAlignment="Center"/>
+                    <Border Background="#0D47A1" Padding="6,3" CornerRadius="4" VerticalAlignment="Center" Margin="0,0,8,0">
+                        <TextBlock x:Name="TxtStoreBadge" Text="[ร้าน: DEFAULT]" FontWeight="Bold" FontSize="12.5" Foreground="#FFEB3B" VerticalAlignment="Center"/>
                     </Border>
                     <!-- License Status Badge (Clickable to open Activate License Dialog) -->
-                    <Border x:Name="BorderLicenseBadge" Background="#E65100" Padding="8,4" CornerRadius="4" VerticalAlignment="Center" Margin="8,0,0,0" Cursor="Hand" MouseDown="BorderLicenseBadge_MouseDown">
-                        <TextBlock x:Name="TxtLicenseBadge" Text="[ สิทธิ์: กำลังตรวจสอบ... ]" FontWeight="Bold" FontSize="12.5" Foreground="White" VerticalAlignment="Center"/>
+                    <Border x:Name="BorderLicenseBadge" Background="#E65100" Padding="6,3" CornerRadius="4" VerticalAlignment="Center" Cursor="Hand" MouseDown="BorderLicenseBadge_MouseDown">
+                        <TextBlock x:Name="TxtLicenseBadge" Text="[ สิทธิ์: กำลังตรวจสอบ... ]" FontWeight="Bold" FontSize="12" Foreground="White" VerticalAlignment="Center"/>
                     </Border>
-                    <TextBlock Text="|" Foreground="#7FA5EB" Margin="12,0" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="TxtCashier" Text="ผู้ใช้งาน: admin [SuperAdmin]" FontSize="14" FontWeight="SemiBold" Foreground="#E0EDFF" VerticalAlignment="Center"/>
-                    <Button x:Name="BtnLogout" Content="ออกจากระบบ" Height="30" Padding="12,2" Margin="14,0,0,0"
-                            Background="#D32F2F" Foreground="White" BorderBrush="#B71C1C" FontSize="13" FontWeight="Bold"
-                            Click="BtnLogout_Click" Cursor="Hand"/>
                 </StackPanel>
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <!-- Right Section: Cashier, Logout, Server Config, Connection & Clock -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock x:Name="TxtCashier" Text="ผู้ใช้งาน: admin [SuperAdmin]" FontSize="13" FontWeight="SemiBold" Foreground="#E0EDFF" VerticalAlignment="Center"/>
+                    <Button x:Name="BtnLogout" Content="ออกจากระบบ" Height="28" Padding="10,0" Margin="8,0,10,0"
+                            Background="#D32F2F" Foreground="White" BorderBrush="#B71C1C" FontSize="12" FontWeight="Bold"
+                            Click="BtnLogout_Click" Cursor="Hand"/>
+
+                    <TextBlock Text="|" Foreground="#7FA5EB" Margin="0,0,10,0" VerticalAlignment="Center"/>
+
                     <!-- Server Config Button -->
-                    <Button x:Name="BtnServerConfig" Content="ตั้งค่าเซิร์ฟเวอร์..." Height="32" Padding="14,2"
-                            Background="#316AC5" Foreground="White" BorderBrush="#1C4BB3" FontWeight="Bold" FontSize="13"
-                            Margin="0,0,14,0" Click="BtnServerConfig_Click" Cursor="Hand"/>
+                    <Button x:Name="BtnServerConfig" Content="ตั้งค่าเซิร์ฟเวอร์..." Height="28" Padding="10,0"
+                            Background="#316AC5" Foreground="White" BorderBrush="#1C4BB3" FontWeight="Bold" FontSize="12"
+                            Margin="0,0,10,0" Click="BtnServerConfig_Click" Cursor="Hand"/>
 
                     <!-- Realtime Connection Status Badge -->
-                    <Border x:Name="BadgeConnection" Background="#2E7D32" CornerRadius="12" Padding="12,5" Margin="0,0,16,0">
-                        <TextBlock x:Name="TxtConnection" Text="เชื่อมต่อเซิร์ฟเวอร์เรียบร้อย" FontSize="12.5" FontWeight="Bold" Foreground="White"/>
+                    <Border x:Name="BadgeConnection" Background="#2E7D32" CornerRadius="10" Padding="10,4" Margin="0,0,10,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtConnection" Text="เชื่อมต่อเซิร์ฟเวอร์เรียบร้อย" FontSize="11.5" FontWeight="Bold" Foreground="White"/>
                     </Border>
 
                     <!-- Clock -->
-                    <TextBlock x:Name="TxtClock" Text="2026-10-07 14:00:00" FontFamily="Consolas" FontSize="15" 
+                    <TextBlock x:Name="TxtClock" Text="2026-10-07 14:00:00" FontFamily="Consolas" FontSize="13.5" 
                                FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                 </StackPanel>
-            </DockPanel>
+            </Grid>
         </Border>
 
         <!-- 1. Live Order Alert Banner (Shows when customer orders online) -->
