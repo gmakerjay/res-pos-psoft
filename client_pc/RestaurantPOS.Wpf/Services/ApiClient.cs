@@ -10,8 +10,9 @@ namespace RestaurantPOS.Wpf.Services;
 
 public class ApiClient
 {
-    private readonly HttpClient _http;
+    private HttpClient _http = null!;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly object _httpLock = new();
     public string BaseUrl { get; private set; }
     public string StoreCode { get; private set; }
 
@@ -19,27 +20,53 @@ public class ApiClient
     {
         BaseUrl = baseUrl.TrimEnd('/');
         StoreCode = string.IsNullOrWhiteSpace(storeCode) ? "DEFAULT" : storeCode.Trim().ToUpperInvariant();
-        _http = new HttpClient
-        {
-            BaseAddress = new Uri(BaseUrl),
-            Timeout = TimeSpan.FromSeconds(8)
-        };
-        _http.DefaultRequestHeaders.Add("X-Tenant-Code", StoreCode);
-        _http.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) RestaurantPOS/1.0");
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
         };
+        InitHttpClient();
         PosLogger.SetServerUrl(BaseUrl);
+    }
+
+    private void InitHttpClient()
+    {
+        lock (_httpLock)
+        {
+            var oldHttp = _http;
+            var newHttp = new HttpClient
+            {
+                BaseAddress = new Uri(BaseUrl),
+                Timeout = TimeSpan.FromSeconds(8)
+            };
+            newHttp.DefaultRequestHeaders.Add("X-Tenant-Code", StoreCode);
+            newHttp.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) RestaurantPOS/1.0");
+
+            if (!string.IsNullOrEmpty(AuthToken))
+            {
+                newHttp.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthToken);
+            }
+
+            _http = newHttp;
+            try { oldHttp?.Dispose(); } catch { }
+        }
     }
 
     public void UpdateConnection(string baseUrl, string storeCode)
     {
-        BaseUrl = baseUrl.TrimEnd('/');
-        StoreCode = string.IsNullOrWhiteSpace(storeCode) ? "DEFAULT" : storeCode.Trim().ToUpperInvariant();
-        _http.BaseAddress = new Uri(BaseUrl);
-        _http.DefaultRequestHeaders.Remove("X-Tenant-Code");
-        _http.DefaultRequestHeaders.Add("X-Tenant-Code", StoreCode);
+        var cleanUrl = baseUrl.TrimEnd('/');
+        var cleanCode = string.IsNullOrWhiteSpace(storeCode) ? "DEFAULT" : storeCode.Trim().ToUpperInvariant();
+
+        bool urlChanged = !string.Equals(BaseUrl, cleanUrl, StringComparison.OrdinalIgnoreCase);
+        bool codeChanged = !string.Equals(StoreCode, cleanCode, StringComparison.OrdinalIgnoreCase);
+
+        BaseUrl = cleanUrl;
+        StoreCode = cleanCode;
+
+        if (urlChanged || codeChanged || _http == null)
+        {
+            InitHttpClient();
+        }
+
         PosLogger.SetServerUrl(BaseUrl);
         PosLogger.Info($"[API] Updated connection to {BaseUrl} (Store: {StoreCode})");
     }
