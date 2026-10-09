@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using RestaurantPOS.Shared.DTOs;
 
 namespace RestaurantPOS.Server.Tenancy;
 
@@ -36,6 +37,36 @@ public interface IPosPresenceTracker
     /// Gets the current simulated status, if any.
     /// </summary>
     bool? GetSimulatedStatus(string tenantCode);
+
+    /// <summary>
+    /// Registers any connected client (POS, KDS, Cashier, QR Table, Management) as an active session.
+    /// </summary>
+    ActiveSessionDto RegisterSession(string connectionId, string tenantCode, string clientType, string? username, string? deviceName, string? ipAddress);
+
+    /// <summary>
+    /// Updates heartbeat timestamp for an active connection.
+    /// </summary>
+    void UpdateHeartbeat(string connectionId);
+
+    /// <summary>
+    /// Unregisters an active session.
+    /// </summary>
+    ActiveSessionDto? UnregisterSession(string connectionId);
+
+    /// <summary>
+    /// Returns all currently active sessions, optionally filtered by RPOS Code / TenantCode.
+    /// </summary>
+    IReadOnlyList<ActiveSessionDto> GetActiveSessions(string? tenantCode = null);
+
+    /// <summary>
+    /// Gets an active session by connection ID.
+    /// </summary>
+    ActiveSessionDto? GetSession(string connectionId);
+
+    /// <summary>
+    /// Removes/kicks a session by connection ID.
+    /// </summary>
+    bool RemoveSession(string connectionId);
 }
 
 public class PosPresenceTracker : IPosPresenceTracker
@@ -51,13 +82,17 @@ public class PosPresenceTracker : IPosPresenceTracker
     private readonly ConcurrentDictionary<string, bool> _simulatedStatus =
         new(StringComparer.OrdinalIgnoreCase);
 
+    // ConnectionId -> ActiveSessionDto
+    private readonly ConcurrentDictionary<string, ActiveSessionDto> _activeSessions = new();
+
     private readonly ILogger<PosPresenceTracker> _logger;
 
     public PosPresenceTracker(ILogger<PosPresenceTracker> logger)
     {
         _logger = logger;
-        // Default sales demo store to Online by default so standalone web demo works out of the box
+        // Default sales demo stores to Online by default so standalone web demo works out of the box
         _simulatedStatus["DEFAULT"] = true;
+        _simulatedStatus["RPOS-DEMO-0001"] = true;
     }
 
     public bool RegisterPos(string tenantCode, string connectionId, string? terminalName)
@@ -72,6 +107,32 @@ public class PosPresenceTracker : IPosPresenceTracker
 
         terminals[connectionId] = terminal;
 
+        // Also update or add session info
+        if (_activeSessions.TryGetValue(connectionId, out var session))
+        {
+            session.StoreCode = cleanCode;
+            session.ClientType = "Windows POS";
+            session.DeviceName = terminal;
+            session.LastHeartbeat = DateTime.UtcNow;
+            session.IsActive = true;
+        }
+        else
+        {
+            _activeSessions[connectionId] = new ActiveSessionDto
+            {
+                ConnectionId = connectionId,
+                StoreCode = cleanCode,
+                ClientType = "Windows POS",
+                Username = "Cashier",
+                Role = "Cashier",
+                DeviceName = terminal,
+                IpAddress = "127.0.0.1",
+                ConnectedAt = DateTime.UtcNow,
+                LastHeartbeat = DateTime.UtcNow,
+                IsActive = true
+            };
+        }
+
         _logger.LogInformation("[POS Presence] Client PC '{TerminalName}' ({ConnectionId}) registered for store '{StoreCode}'. Active terminals: {Count}",
             terminal, connectionId, cleanCode, terminals.Count);
 
@@ -80,6 +141,8 @@ public class PosPresenceTracker : IPosPresenceTracker
 
     public (string? TenantCode, bool BecameOffline) UnregisterPos(string connectionId)
     {
+        UnregisterSession(connectionId);
+
         if (_connectionTenantMap.TryRemove(connectionId, out var tenantCode))
         {
             if (_tenantTerminals.TryGetValue(tenantCode, out var terminals))
@@ -114,6 +177,11 @@ public class PosPresenceTracker : IPosPresenceTracker
             return simulated;
         }
 
+        if (cleanCode.StartsWith("RPOS-DEMO-", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         return false;
     }
 
@@ -146,5 +214,85 @@ public class PosPresenceTracker : IPosPresenceTracker
     {
         var cleanCode = string.IsNullOrWhiteSpace(tenantCode) ? "DEFAULT" : tenantCode.Trim().ToUpperInvariant();
         return _simulatedStatus.TryGetValue(cleanCode, out var val) ? val : null;
+    }
+
+    public ActiveSessionDto RegisterSession(string connectionId, string tenantCode, string clientType, string? username, string? deviceName, string? ipAddress)
+    {
+        var cleanCode = string.IsNullOrWhiteSpace(tenantCode) ? "DEFAULT" : tenantCode.Trim().ToUpperInvariant();
+        var session = new ActiveSessionDto
+        {
+            ConnectionId = connectionId,
+            StoreCode = cleanCode,
+            ClientType = string.IsNullOrWhiteSpace(clientType) ? "Web App" : clientType,
+            Username = string.IsNullOrWhiteSpace(username) ? "ผู้ใช้งาน" : username,
+            Role = !string.IsNullOrWhiteSpace(username) && username.Equals("admin", StringComparison.OrdinalIgnoreCase) ? "Admin" : "User",
+            DeviceName = string.IsNullOrWhiteSpace(deviceName) ? "Web Browser" : deviceName,
+            IpAddress = string.IsNullOrWhiteSpace(ipAddress) ? "127.0.0.1" : ipAddress,
+            ConnectedAt = DateTime.UtcNow,
+            LastHeartbeat = DateTime.UtcNow,
+            IsActive = true
+        };
+
+        _activeSessions[connectionId] = session;
+        _connectionTenantMap[connectionId] = cleanCode;
+
+        _logger.LogInformation("[Session Tracker] New active session registered: {ConnectionId} | Store: {StoreCode} | Type: {ClientType} | User: {User}",
+            connectionId, cleanCode, session.ClientType, session.Username);
+
+        return session;
+    }
+
+    public void UpdateHeartbeat(string connectionId)
+    {
+        if (_activeSessions.TryGetValue(connectionId, out var session))
+        {
+            session.LastHeartbeat = DateTime.UtcNow;
+            session.IsActive = true;
+        }
+    }
+
+    public ActiveSessionDto? UnregisterSession(string connectionId)
+    {
+        if (_activeSessions.TryRemove(connectionId, out var session))
+        {
+            session.IsActive = false;
+            _logger.LogInformation("[Session Tracker] Session ended: {ConnectionId} | Store: {StoreCode} | Type: {Type}",
+                connectionId, session.StoreCode, session.ClientType);
+            return session;
+        }
+        return null;
+    }
+
+    public IReadOnlyList<ActiveSessionDto> GetActiveSessions(string? tenantCode = null)
+    {
+        // Purge dead sessions older than 3 minutes without heartbeat
+        var cutoff = DateTime.UtcNow.AddMinutes(-3);
+        foreach (var kvp in _activeSessions)
+        {
+            if (kvp.Value.LastHeartbeat < cutoff)
+            {
+                _activeSessions.TryRemove(kvp.Key, out _);
+            }
+        }
+
+        var list = _activeSessions.Values.ToList();
+        if (!string.IsNullOrWhiteSpace(tenantCode) && !tenantCode.Equals("ALL", StringComparison.OrdinalIgnoreCase))
+        {
+            var clean = tenantCode.Trim().ToUpperInvariant();
+            list = list.Where(s => s.StoreCode.Equals(clean, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        return list.OrderByDescending(s => s.ConnectedAt).ToList();
+    }
+
+    public ActiveSessionDto? GetSession(string connectionId)
+    {
+        return _activeSessions.TryGetValue(connectionId, out var session) ? session : null;
+    }
+
+    public bool RemoveSession(string connectionId)
+    {
+        UnregisterPos(connectionId);
+        return _activeSessions.TryRemove(connectionId, out _);
     }
 }

@@ -130,11 +130,9 @@ public class OrderItemDto
 
     public string StatusBadge => Status switch
     {
-        OrderStatus.New => "[ออเดอร์ใหม่]",
-        OrderStatus.Accepted => "[รับแล้ว]",
-        OrderStatus.Preparing => "[กำลังปรุง]",
-        OrderStatus.Ready => "[ปรุงเสร็จแล้ว]",
-        OrderStatus.Completed => "[เสร็จสิ้น]",
+        OrderStatus.New or OrderStatus.Accepted => "[รับออเดอร์]",
+        OrderStatus.Preparing or OrderStatus.Ready => "[รอเสิร์ฟ]",
+        OrderStatus.Completed => "[เสิร์ฟแล้ว]",
         OrderStatus.Cancelled => "[ยกเลิก]",
         _ => Status.ToString()
     };
@@ -172,28 +170,28 @@ public class OrderDto
 
     public string StatusBadge => Status switch
     {
-        OrderStatus.New => "[ออเดอร์ใหม่]",
-        OrderStatus.Accepted => "[รับออเดอร์แล้ว]",
-        OrderStatus.Preparing => "[กำลังปรุง]",
-        OrderStatus.Ready => "[ปรุงเสร็จแล้ว]",
-        OrderStatus.Completed => "[เสร็จสิ้น]",
+        OrderStatus.New or OrderStatus.Accepted => "[รับออเดอร์]",
+        OrderStatus.Preparing or OrderStatus.Ready => "[รอเสิร์ฟ]",
+        OrderStatus.Completed => "[เสิร์ฟแล้ว]",
         OrderStatus.Cancelled => "[ยกเลิก]",
         _ => Status.ToString()
     };
 
+    // Simplified 3-Step Lifecycle: รับออเดอร์ > รอเสิร์ฟ > เสิร์ฟแล้ว
+    public bool CanServe => Status == OrderStatus.New || Status == OrderStatus.Accepted;
+    public bool CanCancel => Status != OrderStatus.Completed && Status != OrderStatus.Cancelled;
+    public bool IsActive => Status != OrderStatus.Completed && Status != OrderStatus.Cancelled;
+
+    // Strict sequential legacy guards for backward compatibility and tests
     public bool CanAccept => Status == OrderStatus.New;
     public bool CanPrepare => Status == OrderStatus.Accepted;
     public bool CanReady => Status == OrderStatus.Preparing;
     public bool CanComplete => Status == OrderStatus.Ready;
-    public bool CanCancel => Status != OrderStatus.Completed && Status != OrderStatus.Cancelled;
-    public bool IsActive => Status != OrderStatus.Completed && Status != OrderStatus.Cancelled;
 
     public string StatusColorHex => Status switch
     {
-        OrderStatus.New => "#DC2626",
-        OrderStatus.Accepted => "#1D4ED8",
-        OrderStatus.Preparing => "#D97706",
-        OrderStatus.Ready => "#EA580C",
+        OrderStatus.New or OrderStatus.Accepted => "#1D4ED8",
+        OrderStatus.Preparing or OrderStatus.Ready => "#D97706",
         OrderStatus.Completed => "#16A34A",
         OrderStatus.Cancelled => "#64748B",
         _ => "#334155"
@@ -425,6 +423,51 @@ public class GenerateKeyResponse
     public string Plan { get; set; } = string.Empty;
     public string LicenseKey { get; set; } = string.Empty;
     public string MessageTemplate { get; set; } = string.Empty;
+}
+
+public class ActiveSessionDto
+{
+    public string ConnectionId { get; set; } = string.Empty;
+    public string StoreCode { get; set; } = string.Empty;
+    public string ClientType { get; set; } = string.Empty; // "Windows POS", "จอครัว KDS", "Web แคชเชียร์", "ลูกค้า QR โต๊ะ", "Web จัดการร้าน"
+    public string Username { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public string DeviceName { get; set; } = string.Empty;
+    public string IpAddress { get; set; } = string.Empty;
+    public DateTime ConnectedAt { get; set; } = DateTime.UtcNow;
+    public DateTime LastHeartbeat { get; set; } = DateTime.UtcNow;
+    public bool IsActive { get; set; } = true;
+}
+
+public class ServerDiagnosticsDto
+{
+    public string ServerMode { get; set; } = "Platform";
+    public bool AllowRegistration { get; set; } = true;
+    public string StandaloneRPOSCode { get; set; } = string.Empty;
+    public string Uptime { get; set; } = string.Empty;
+    public double MemoryUsageMb { get; set; }
+    public int TotalTenants { get; set; }
+    public int ActiveSessionsCount { get; set; }
+    public int ActivePosTerminalsCount { get; set; }
+    public DateTime ServerTimeUtc { get; set; } = DateTime.UtcNow;
+    public DateTime ServerTimeLocal { get; set; } = DateTime.UtcNow.AddHours(7);
+    public string OsVersion { get; set; } = string.Empty;
+    public string DotNetVersion { get; set; } = string.Empty;
+}
+
+public class PlatformModeDto
+{
+    public string ServerMode { get; set; } = "Platform"; // "Platform" or "Standalone"
+    public bool AllowStoreRegistration { get; set; } = true;
+    public string StandaloneRPOSCode { get; set; } = string.Empty;
+}
+
+public class DevActionRequest
+{
+    public string Action { get; set; } = string.Empty; // "force_sync", "ping", "clear_cache", "kick_session"
+    public string? TargetStoreCode { get; set; }
+    public string? TargetConnectionId { get; set; }
+    public string? Message { get; set; }
 }
 
 

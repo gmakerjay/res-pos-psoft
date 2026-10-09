@@ -49,6 +49,8 @@ builder.Services.AddDbContext<RestaurantPOS.Server.Tenancy.MasterDbContext>(opti
 });
 
 // Multi-Tenant Services
+builder.Services.Configure<RestaurantPOS.Server.Settings.PlatformSettings>(
+    builder.Configuration.GetSection(RestaurantPOS.Server.Settings.PlatformSettings.SectionName));
 builder.Services.AddScoped<RestaurantPOS.Server.Tenancy.ITenantProvider, RestaurantPOS.Server.Tenancy.TenantProvider>();
 builder.Services.AddScoped<RestaurantPOS.Server.Tenancy.ITenantService, RestaurantPOS.Server.Tenancy.TenantService>();
 builder.Services.AddScoped<RestaurantPOS.Server.Tenancy.ITenantNotifier, RestaurantPOS.Server.Tenancy.TenantNotifier>();

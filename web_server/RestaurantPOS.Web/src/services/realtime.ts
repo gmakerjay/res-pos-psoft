@@ -1,6 +1,6 @@
 import * as signalR from '@microsoft/signalr';
 import { getServerUrl, logError, logInfo } from './logger';
-import { getStoredTenantCode, type Order, type TableItem } from './api';
+import { getStoredTenantCode, getStoredUser, type Order, type TableItem } from './api';
 
 export type ConnectionState = 'connected' | 'reconnecting' | 'disconnected';
 
@@ -26,6 +26,8 @@ export interface OrderActionActivity {
 
 export class RealtimeService {
   private hub: signalR.HubConnection | null = null;
+  private currentTenantCode: string = '';
+  private heartbeatTimer: any = null;
   private stateListeners: ((state: ConnectionState) => void)[] = [];
   private orderCreatedListeners: ((order: Order) => void)[] = [];
   private orderStatusListeners: ((order: Order) => void)[] = [];
@@ -36,12 +38,28 @@ export class RealtimeService {
   private ingredientUpdatedListeners: ((data: any) => void)[] = [];
   private storeStatusListeners: ((data: StoreStatusEventData) => void)[] = [];
   private orderActionListeners: ((data: OrderActionActivity) => void)[] = [];
+  private forceSyncListeners: (() => void)[] = [];
+  private sessionKickedListeners: ((data: any) => void)[] = [];
 
-  public start() {
-    if (this.hub) return;
+  public start(explicitTenant?: string, clientType: string = 'Web App') {
+    const tenant = (explicitTenant || getStoredTenantCode() || 'DEFAULT').trim().toUpperCase();
 
-    const tenant = getStoredTenantCode();
-    const hubUrl = `${getServerUrl()}/hubs/pos?tenant=${encodeURIComponent(tenant)}`;
+    // If hub exists and already connected to this tenant, no need to recreate
+    if (this.hub && this.currentTenantCode === tenant) return;
+
+    // If hub exists for another tenant, stop it first
+    if (this.hub) {
+      try {
+        this.hub.stop();
+      } catch { }
+      this.hub = null;
+    }
+
+    this.currentTenantCode = tenant;
+    const user = getStoredUser();
+    const username = user?.fullName || user?.username || 'ผู้ใช้งาน';
+
+    const hubUrl = `${getServerUrl()}/hubs/pos?tenant=${encodeURIComponent(tenant)}&type=${encodeURIComponent(clientType)}&user=${encodeURIComponent(username)}`;
     this.hub = new signalR.HubConnectionBuilder()
       .withUrl(hubUrl)
       .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
@@ -61,6 +79,7 @@ export class RealtimeService {
     this.hub.onclose((error) => {
       logInfo(`SignalR closed: ${error?.message}`, 'Web-SignalR');
       this.notifyState('disconnected');
+      this.stopHeartbeat();
     });
 
     this.hub.on('OrderCreated', (order: Order) => {
@@ -101,10 +120,21 @@ export class RealtimeService {
       this.orderActionListeners.forEach(cb => cb(data));
     });
 
+    this.hub.on('ForceSync', () => {
+      logInfo('ForceSync signal received from server', 'Web-SignalR');
+      this.forceSyncListeners.forEach(cb => cb());
+    });
+
+    this.hub.on('SessionKicked', (data: any) => {
+      logInfo(`Session kicked by server: ${data?.Reason || 'Admin command'}`, 'Web-SignalR');
+      this.sessionKickedListeners.forEach(cb => cb(data));
+    });
+
     this.hub.start()
       .then(() => {
         logInfo('SignalR connected to ' + hubUrl, 'Web-SignalR');
         this.notifyState('connected');
+        this.startHeartbeat();
       })
       .catch((err) => {
         logError('SignalR failed to start: ' + err.message, err, 'Web-SignalR');
@@ -112,7 +142,27 @@ export class RealtimeService {
       });
   }
 
+  public setTenant(newTenant: string, clientType: string = 'Web App') {
+    const normalized = (newTenant || 'DEFAULT').trim().toUpperCase();
+    if (this.currentTenantCode !== normalized || !this.hub) {
+      logInfo(`Switching SignalR tenant to: ${normalized}`, 'Web-SignalR');
+      this.currentTenantCode = normalized;
+      this.restart(normalized, clientType);
+    }
+  }
+
+  public async registerSession(clientType: string, username?: string) {
+    if (this.hub && this.hub.state === signalR.HubConnectionState.Connected) {
+      try {
+        await this.hub.invoke('RegisterSession', clientType, username);
+      } catch (err) {
+        logError('Failed to register session with hub: ' + err, err, 'Web-SignalR');
+      }
+    }
+  }
+
   public stop() {
+    this.stopHeartbeat();
     if (this.hub) {
       this.hub.stop();
       this.hub = null;
@@ -190,14 +240,47 @@ export class RealtimeService {
     };
   }
 
-  public async restart() {
+  public onForceSync(cb: () => void) {
+    this.forceSyncListeners.push(cb);
+    return () => {
+      this.forceSyncListeners = this.forceSyncListeners.filter(l => l !== cb);
+    };
+  }
+
+  public onSessionKicked(cb: (data: any) => void) {
+    this.sessionKickedListeners.push(cb);
+    return () => {
+      this.sessionKickedListeners = this.sessionKickedListeners.filter(l => l !== cb);
+    };
+  }
+
+  public async restart(explicitTenant?: string, clientType: string = 'Web App') {
+    this.stopHeartbeat();
     if (this.hub) {
       try {
         await this.hub.stop();
       } catch { }
       this.hub = null;
     }
-    this.start();
+    this.start(explicitTenant, clientType);
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(async () => {
+      if (this.hub && this.hub.state === signalR.HubConnectionState.Connected) {
+        try {
+          await this.hub.invoke('Heartbeat');
+        } catch { }
+      }
+    }, 25000);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
   }
 
   private notifyState(state: ConnectionState) {
@@ -206,3 +289,11 @@ export class RealtimeService {
 }
 
 export const realtimeService = new RealtimeService();
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pos:tenant-changed', (e: any) => {
+    if (e?.detail) {
+      realtimeService.setTenant(e.detail);
+    }
+  });
+}

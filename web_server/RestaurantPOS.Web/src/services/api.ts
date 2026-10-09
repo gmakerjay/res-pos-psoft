@@ -206,14 +206,70 @@ export interface GenerateKeyResponse {
   messageTemplate: string;
 }
 
+export interface ActiveSessionItem {
+  connectionId: string;
+  storeCode: string;
+  clientType: string;
+  username: string;
+  role: string;
+  deviceName: string;
+  ipAddress: string;
+  connectedAt: string;
+  lastHeartbeat: string;
+  isActive: boolean;
+}
+
+export interface ServerDiagnostics {
+  serverMode: string;
+  allowRegistration: boolean;
+  standaloneRPOSCode: string;
+  uptime: string;
+  memoryUsageMb: number;
+  totalTenants: number;
+  activeSessionsCount: number;
+  activePosTerminalsCount: number;
+  serverTimeUtc: string;
+  serverTimeLocal: string;
+  osVersion: string;
+  dotNetVersion: string;
+}
+
+export interface PlatformMode {
+  serverMode: string;
+  allowStoreRegistration: boolean;
+  standaloneRPOSCode: string;
+}
+
+export interface TenantSummaryItem {
+  id: number;
+  storeCode: string;
+  storeName: string;
+  ownerName: string;
+  ownerPhone: string;
+  isActive: boolean;
+  createdAt: string;
+  subscriptionPlan: string;
+  tables: number;
+  products: number;
+  orders: number;
+  dbSizeKb: number;
+  isOnline: boolean;
+  activeTerminals: number;
+}
+
 export function getStoredTenantCode(): string {
   if (typeof window !== 'undefined') {
+    const isStandaloneRoute = window.location.pathname.toLowerCase().startsWith('/standalone') || 
+      new URLSearchParams(window.location.search).get('mode') === 'standalone';
     const params = new URLSearchParams(window.location.search);
     const tenantParam = params.get('store') || params.get('shop') || params.get('tenant') || params.get('code');
     if (tenantParam) {
       const normalized = tenantParam.trim().toUpperCase();
       localStorage.setItem('pos_tenant_code', normalized);
       return normalized;
+    }
+    if (isStandaloneRoute) {
+      return 'RPOS-DEMO-0001';
     }
   }
   return localStorage.getItem('pos_tenant_code') || 'DEFAULT';
@@ -222,13 +278,19 @@ export function getStoredTenantCode(): string {
 export function setStoredTenantCode(code: string) {
   const normalized = (code || 'DEFAULT').trim().toUpperCase();
   localStorage.setItem('pos_tenant_code', normalized);
-  if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
+  if (typeof window !== 'undefined') {
     try {
-      const url = new URL(window.location.href);
-      url.searchParams.set('store', normalized);
-      window.history.replaceState({}, '', url.toString());
-    } catch {
-      // Ignore if URL modification fails in some environments
+      window.dispatchEvent(new CustomEvent('pos:tenant-changed', { detail: normalized }));
+    } catch { }
+
+    if (window.history && window.history.replaceState) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('store', normalized);
+        window.history.replaceState({}, '', url.toString());
+      } catch {
+        // Ignore if URL modification fails in some environments
+      }
     }
   }
 }
@@ -344,10 +406,15 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const token = getStoredToken();
   const tenantCode = getStoredTenantCode();
   const devKey = getStoredDevKey();
+  const isStandaloneRoute = typeof window !== 'undefined' && 
+    (window.location.pathname.toLowerCase().startsWith('/standalone') || 
+     new URLSearchParams(window.location.search).get('mode') === 'standalone');
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Tenant-Code': tenantCode,
-    ...(devKey ? { 'X-Dev-Key': devKey } : {}),
+    ...(isStandaloneRoute ? { 'X-Request-Mode': 'standalone' } : {}),
+    ...(devKey && !isStandaloneRoute ? { 'X-Dev-Key': devKey } : {}),
     ...(options.headers as Record<string, string> || {})
   };
 
@@ -616,3 +683,49 @@ export async function downloadStoreBackup(): Promise<void> {
   a.remove();
   window.URL.revokeObjectURL(downloadUrl);
 }
+
+// -------------------------------------------------------------
+// DEV & PLATFORM API ENDPOINTS
+// -------------------------------------------------------------
+
+export async function getPlatformMode(): Promise<PlatformMode> {
+  const isStandaloneRoute = typeof window !== 'undefined' && 
+    (window.location.pathname.toLowerCase().startsWith('/standalone') || 
+     new URLSearchParams(window.location.search).get('mode') === 'standalone');
+  const url = isStandaloneRoute ? '/api/stores/mode?mode=standalone' : '/api/stores/mode';
+  return request<PlatformMode>(url);
+}
+
+export async function getActiveSessions(storeCode?: string): Promise<ActiveSessionItem[]> {
+  const query = storeCode ? `?store=${encodeURIComponent(storeCode)}` : '';
+  return request<ActiveSessionItem[]>(`/api/dev/sessions${query}`);
+}
+
+export async function kickSession(connectionId: string, message?: string): Promise<any> {
+  return request<any>(`/api/dev/sessions/${encodeURIComponent(connectionId)}/kick`, {
+    method: 'POST',
+    body: JSON.stringify({ message: message || 'Session terminated by DEV admin' })
+  });
+}
+
+export async function getServerDiagnostics(): Promise<ServerDiagnostics> {
+  return request<ServerDiagnostics>('/api/dev/diagnostics');
+}
+
+export async function devForceSync(targetStoreCode?: string): Promise<any> {
+  return request<any>('/api/dev/force-sync', {
+    method: 'POST',
+    body: JSON.stringify({ targetStoreCode: targetStoreCode || 'ALL' })
+  });
+}
+
+export async function devClearCache(): Promise<any> {
+  return request<any>('/api/dev/clear-cache', {
+    method: 'POST'
+  });
+}
+
+export async function getAllTenantsSummary(): Promise<TenantSummaryItem[]> {
+  return request<TenantSummaryItem[]>('/api/dev/tenants');
+}
+

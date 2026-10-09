@@ -70,7 +70,14 @@ export function TableManagerView({ storeInfo }: TableManagerViewProps) {
       setSelectedTable((curr) => (curr && curr.id === updated.id ? { ...curr, ...updated } : curr));
     });
 
-    return () => unsub();
+    const unsubForce = realtimeService.onForceSync(() => {
+      loadTables();
+    });
+
+    return () => {
+      unsub();
+      unsubForce();
+    };
   }, []);
 
   const handleSelectTable = (table: TableItem) => {

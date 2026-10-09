@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { registerStore, setStoredTenantCode } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { registerStore, setStoredTenantCode, getPlatformMode, type PlatformMode } from '../services/api';
 import type { StoreInfo } from '../services/api';
 import { getServerUrl } from '../services/logger';
 
@@ -7,11 +7,6 @@ interface RegisterStorePageProps {
   onBackToHome?: () => void;
   onOpenLogin?: (storeCode?: string) => void;
   onStoreCreated?: (store: StoreInfo) => void;
-}
-
-function generateRandomShopCode(): string {
-  const num = Math.floor(1000 + Math.random() * 9000);
-  return `SHOP${num}`;
 }
 
 function generateSecureStoreCode(): string {
@@ -29,7 +24,7 @@ function generateSecureStoreCode(): string {
 export function RegisterStorePage({ onBackToHome, onOpenLogin, onStoreCreated }: RegisterStorePageProps) {
   // Form States
   const [storeName, setStoreName] = useState<string>('');
-  const [storeCode, setStoreCode] = useState<string>(() => generateRandomShopCode());
+  const [storeCode, setStoreCode] = useState<string>(() => generateSecureStoreCode());
   const [adminPassword, setAdminPassword] = useState<string>('123456');
   const [confirmPassword, setConfirmPassword] = useState<string>('123456');
   const [address, setAddress] = useState<string>('');
@@ -48,6 +43,11 @@ export function RegisterStorePage({ onBackToHome, onOpenLogin, onStoreCreated }:
   const [copiedStoreCode, setCopiedStoreCode] = useState<boolean>(false);
   const [copiedPassword, setCopiedPassword] = useState<boolean>(false);
   const [copiedAllInfo, setCopiedAllInfo] = useState<boolean>(false);
+  const [platformMode, setPlatformMode] = useState<PlatformMode | null>(null);
+
+  useEffect(() => {
+    getPlatformMode().then(pm => setPlatformMode(pm)).catch(() => {});
+  }, []);
 
   const serverApiUrl = typeof window !== 'undefined' ? (getServerUrl() || window.location.origin) : 'https://spk.p-services.net';
 
@@ -67,10 +67,6 @@ export function RegisterStorePage({ onBackToHome, onOpenLogin, onStoreCreated }:
       setCopiedAllInfo(true);
       setTimeout(() => setCopiedAllInfo(false), 3000);
     }
-  };
-
-  const handleRandomizeShopCode = () => {
-    setStoreCode(generateRandomShopCode());
   };
 
   const handleRandomizeRposCode = () => {
@@ -161,7 +157,7 @@ export function RegisterStorePage({ onBackToHome, onOpenLogin, onStoreCreated }:
   const handleResetForAnotherStore = () => {
     setCreatedStore(null);
     setStoreName('');
-    setStoreCode(generateRandomShopCode());
+    setStoreCode(generateSecureStoreCode());
     setAdminPassword('123456');
     setConfirmPassword('123456');
     setAddress('');
@@ -169,6 +165,99 @@ export function RegisterStorePage({ onBackToHome, onOpenLogin, onStoreCreated }:
     setOwnerName('');
     setErrorMessage('');
   };
+
+  if (platformMode && (platformMode.serverMode === 'Standalone' || !platformMode.allowStoreRegistration)) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F0F4F8',
+        fontFamily: 'Tahoma, Segoe UI, sans-serif',
+        padding: '20px'
+      }}>
+        <div style={{
+          backgroundColor: '#FFF',
+          border: '1px solid #CCC',
+          borderRadius: '8px',
+          padding: '32px',
+          maxWidth: '520px',
+          width: '100%',
+          textAlign: 'center',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{
+            display: 'inline-block',
+            backgroundColor: '#FFEBEE',
+            color: '#C62828',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            padding: '4px 12px',
+            borderRadius: '4px',
+            marginBottom: '12px'
+          }}>
+            [ ปิดรับสมัครร้านค้าใหม่ ]
+          </div>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1a1a1a', margin: '0 0 10px 0' }}>
+            ระบบนี้ทำงานในโหมด Standalone (เฉพาะร้านค้า)
+          </h2>
+          <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.6', margin: '0 0 20px 0' }}>
+            เซิร์ฟเวอร์ได้รับการตั้งค่าเพื่อให้บริการร้านค้านี้โดยเฉพาะ และปิดการลงทะเบียนเปิดสาขาใหม่เพื่อความปลอดภัยและเสถียรภาพของระบบ
+          </p>
+          {platformMode.standaloneRPOSCode && (
+            <div style={{
+              backgroundColor: '#E3F2FD',
+              border: '1px solid #90CAF9',
+              borderRadius: '4px',
+              padding: '10px',
+              marginBottom: '20px',
+              fontSize: '12px',
+              color: '#0D47A1'
+            }}>
+              รหัส RPOS ประจำร้านค้านี้: <strong>{platformMode.standaloneRPOSCode}</strong>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            {onBackToHome && (
+              <button
+                onClick={onBackToHome}
+                style={{
+                  padding: '8px 18px',
+                  backgroundColor: '#1976D2',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                [ กลับสู่หน้าหลัก ]
+              </button>
+            )}
+            {onOpenLogin && (
+              <button
+                onClick={() => onOpenLogin(platformMode.standaloneRPOSCode)}
+                style={{
+                  padding: '8px 18px',
+                  backgroundColor: '#2E7D32',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                [ เข้าสู่ระบบร้านค้า ]
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: 'relative', width: '100%', minHeight: '100vh', backgroundColor: '#F0F4F8' }}>
@@ -413,7 +502,7 @@ export function RegisterStorePage({ onBackToHome, onOpenLogin, onStoreCreated }:
                       cursor: 'pointer'
                     }}
                   >
-                    {copiedStoreCode ? '[ คัดลอกไอดีแล้ว ]' : '[ คัดลอก Store ID ]'}
+                    {copiedStoreCode ? '[ คัดลอก RPOS Code แล้ว ]' : '[ คัดลอก RPOS Code ]'}
                   </button>
                 </div>
 
@@ -653,55 +742,36 @@ export function RegisterStorePage({ onBackToHome, onOpenLogin, onStoreCreated }:
                   </span>
                 </div>
 
-                {/* 2. รหัสร้านค้า (Store Code / ID) */}
+                {/* 2. รหัสเชื่อมต่อร้านค้า (RPOS Code) */}
                 <div style={{ marginBottom: '18px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
                     <label style={{ fontSize: '13.5px', fontWeight: 'bold', color: '#212121' }}>
-                      รหัสร้านค้า (Store ID / รหัสเชื่อมต่อโปรแกรม) *
+                      รหัสเชื่อมต่อร้านค้า (RPOS Code) *
                     </label>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button
-                        type="button"
-                        onClick={handleRandomizeShopCode}
-                        style={{
-                          backgroundColor: '#E3F2FD',
-                          color: '#1565C0',
-                          border: '1px solid #90CAF9',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer'
-                        }}
-                        title="สุ่มรหัสสั้นแบบ SHOP"
-                      >
-                        [ สุ่มรหัส SHOP ]
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleRandomizeRposCode}
-                        style={{
-                          backgroundColor: '#ECEFF1',
-                          color: '#37474F',
-                          border: '1px solid #CFD8DC',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer'
-                        }}
-                        title="สุ่มรหัสมาตรฐาน RPOS"
-                      >
-                        [ สุ่มรหัส RPOS ]
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRandomizeRposCode}
+                      style={{
+                        backgroundColor: '#E3F2FD',
+                        color: '#1565C0',
+                        border: '1px solid #90CAF9',
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        fontSize: '11.5px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                      }}
+                      title="สุ่มรหัส RPOS ใหม่"
+                    >
+                      [ สุ่มรหัส RPOS ใหม่ ]
+                    </button>
                   </div>
                   <input
                     type="text"
                     required
                     value={storeCode}
                     onChange={(e) => setStoreCode(e.target.value.toUpperCase())}
-                    placeholder="เช่น SHOP8821 หรือ RPOS-XXXX-XXXX"
+                    placeholder="เช่น RPOS-A7B2-9KC4"
                     style={{
                       width: '100%',
                       padding: '11px 14px',
@@ -717,7 +787,7 @@ export function RegisterStorePage({ onBackToHome, onOpenLogin, onStoreCreated }:
                     }}
                   />
                   <span style={{ fontSize: '11.5px', color: '#546E7A', marginTop: '4px', display: 'block' }}>
-                    รหัสนี้คือ <strong>"ไอดีร้านค้า"</strong> สำหรับนำไปกรอกล็อกอินในโปรแกรม POS หน้าร้าน และเป็น ID ร้านของคุณ
+                    รหัสนี้คือ <strong>"RPOS Code"</strong> สำหรับนำไปกรอกเชื่อมต่อในโปรแกรม Windows Desktop POS และ Web Hub ประจำร้านคุณ
                   </span>
                 </div>
 

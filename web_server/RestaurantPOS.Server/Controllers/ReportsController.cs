@@ -29,7 +29,9 @@ public class ReportsController : ControllerBase
 
         var orders = await _db.Orders
             .Include(o => o.Items)
-            .Where(o => o.CreatedAt >= startUtc && o.CreatedAt < endUtc && o.Status == OrderStatus.Completed)
+            .Where(o => o.Status == OrderStatus.Completed &&
+                        ((o.CompletedAt.HasValue && o.CompletedAt.Value >= startUtc && o.CompletedAt.Value < endUtc) ||
+                         (!o.CompletedAt.HasValue && o.CreatedAt >= startUtc && o.CreatedAt < endUtc)))
             .ToListAsync();
 
         var totalSales = orders.Sum(o => o.TotalAmount);

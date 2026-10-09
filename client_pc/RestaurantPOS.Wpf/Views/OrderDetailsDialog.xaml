@@ -117,14 +117,10 @@
         <!-- 3. Bottom Action Bar -->
         <Border Grid.Row="2" Background="#D8D4C8" BorderBrush="#9E9A8E" BorderThickness="0,1,0,0" Padding="14,10">
             <DockPanel LastChildFill="False">
-                <Button x:Name="BtnAcceptOrder" Content="[ รับออเดอร์ ]" Height="38" Padding="14,0" Margin="0,0,6,0"
-                        Background="#1D4ED8" Foreground="White" BorderBrush="#1E40AF" FontWeight="Bold" FontSize="13.5"
-                        Click="BtnAcceptOrder_Click" Cursor="Hand"/>
-                <Button x:Name="BtnPrepareOrder" Content="[ กำลังปรุง ]" Height="38" Padding="14,0" Margin="0,0,6,0"
+                <Button x:Name="BtnAcceptOrder" Visibility="Collapsed" Click="BtnAcceptOrder_Click"/>
+                <Button x:Name="BtnPrepareOrder" Visibility="Collapsed" Click="BtnPrepareOrder_Click"/>
+                <Button x:Name="BtnReadyOrder" Content="[ รอเสิร์ฟ ]" Height="38" Padding="14,0" Margin="0,0,6,0"
                         Background="#D97706" Foreground="White" BorderBrush="#B45309" FontWeight="Bold" FontSize="13.5"
-                        Click="BtnPrepareOrder_Click" Cursor="Hand"/>
-                <Button x:Name="BtnReadyOrder" Content="[ ปรุงเสร็จแล้ว ]" Height="38" Padding="14,0" Margin="0,0,6,0"
-                        Background="#EA580C" Foreground="White" BorderBrush="#C2410C" FontWeight="Bold" FontSize="13.5"
                         Click="BtnReadyOrder_Click" Cursor="Hand"/>
                 <Button x:Name="BtnCompleteOrder" Content="[ เสิร์ฟแล้ว ]" Height="38" Padding="14,0" Margin="0,0,6,0"
                         Background="#15803D" Foreground="White" BorderBrush="#166534" FontWeight="Bold" FontSize="13.5"

@@ -101,11 +101,7 @@ public partial class OrderDetailsDialog : Window
         TxtOrderStatus.Text = _order.StatusBadge;
 
         // Reset button texts & opacities
-        BtnAcceptOrder.Content = "[ รับออเดอร์ ]";
-        BtnAcceptOrder.Opacity = 1.0;
-        BtnPrepareOrder.Content = "[ กำลังปรุง ]";
-        BtnPrepareOrder.Opacity = 1.0;
-        BtnReadyOrder.Content = "[ ปรุงเสร็จแล้ว ]";
+        BtnReadyOrder.Content = "[ รอเสิร์ฟ ]";
         BtnReadyOrder.Opacity = 1.0;
         BtnCompleteOrder.Content = "[ เสิร์ฟแล้ว ]";
         BtnCompleteOrder.Opacity = 1.0;
@@ -115,49 +111,27 @@ public partial class OrderDetailsDialog : Window
         switch (status)
         {
             case OrderStatus.New:
-                TxtOrderStatus.Foreground = new SolidColorBrush(Color.FromRgb(220, 38, 38)); // Red
-                BtnAcceptOrder.IsEnabled = true;
-                BtnPrepareOrder.IsEnabled = false;
-                BtnReadyOrder.IsEnabled = false;
-                BtnCompleteOrder.IsEnabled = false;
-                BtnCancelOrder.IsEnabled = true;
-                break;
             case OrderStatus.Accepted:
                 TxtOrderStatus.Foreground = new SolidColorBrush(Color.FromRgb(29, 78, 216)); // Blue
-                BtnAcceptOrder.IsEnabled = false;
-                BtnPrepareOrder.IsEnabled = true;
-                BtnReadyOrder.IsEnabled = false;
-                BtnCompleteOrder.IsEnabled = false;
-                BtnCancelOrder.IsEnabled = true;
-                break;
-            case OrderStatus.Preparing:
-                TxtOrderStatus.Foreground = new SolidColorBrush(Color.FromRgb(217, 119, 6)); // Amber
-                BtnAcceptOrder.IsEnabled = false;
-                BtnPrepareOrder.IsEnabled = false;
                 BtnReadyOrder.IsEnabled = true;
                 BtnCompleteOrder.IsEnabled = false;
                 BtnCancelOrder.IsEnabled = true;
                 break;
+            case OrderStatus.Preparing:
             case OrderStatus.Ready:
-                TxtOrderStatus.Foreground = new SolidColorBrush(Color.FromRgb(234, 88, 12)); // Orange
-                BtnAcceptOrder.IsEnabled = false;
-                BtnPrepareOrder.IsEnabled = false;
+                TxtOrderStatus.Foreground = new SolidColorBrush(Color.FromRgb(217, 119, 6)); // Amber
                 BtnReadyOrder.IsEnabled = false;
                 BtnCompleteOrder.IsEnabled = true;
                 BtnCancelOrder.IsEnabled = false;
                 break;
             case OrderStatus.Completed:
                 TxtOrderStatus.Foreground = new SolidColorBrush(Color.FromRgb(22, 163, 74)); // Green
-                BtnAcceptOrder.IsEnabled = false;
-                BtnPrepareOrder.IsEnabled = false;
                 BtnReadyOrder.IsEnabled = false;
                 BtnCompleteOrder.IsEnabled = false;
                 BtnCancelOrder.IsEnabled = false;
                 break;
             case OrderStatus.Cancelled:
                 TxtOrderStatus.Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)); // Gray
-                BtnAcceptOrder.IsEnabled = false;
-                BtnPrepareOrder.IsEnabled = false;
                 BtnReadyOrder.IsEnabled = false;
                 BtnCompleteOrder.IsEnabled = false;
                 BtnCancelOrder.IsEnabled = false;
@@ -212,12 +186,12 @@ public partial class OrderDetailsDialog : Window
 
     private async void BtnReadyOrder_Click(object sender, RoutedEventArgs e)
     {
-        await ExecuteStatusChangeAsync(BtnReadyOrder, OrderStatus.Ready, "เปลี่ยนสถานะเป็น [ปรุงเสร็จแล้ว] พร้อมเสิร์ฟหรือส่งมอบ");
+        await ExecuteStatusChangeAsync(BtnReadyOrder, OrderStatus.Ready, "เปลี่ยนสถานะเป็น [รอเสิร์ฟ] เรียบร้อยแล้ว");
     }
 
     private async void BtnCompleteOrder_Click(object sender, RoutedEventArgs e)
     {
-        await ExecuteStatusChangeAsync(BtnCompleteOrder, OrderStatus.Completed, "เปลี่ยนสถานะเป็น [เสิร์ฟแล้ว/เสร็จสิ้น] เรียบร้อย");
+        await ExecuteStatusChangeAsync(BtnCompleteOrder, OrderStatus.Completed, "เปลี่ยนสถานะเป็น [เสิร์ฟแล้ว] เรียบร้อยแล้ว");
     }
 
     private async void BtnCancelOrder_Click(object sender, RoutedEventArgs e)

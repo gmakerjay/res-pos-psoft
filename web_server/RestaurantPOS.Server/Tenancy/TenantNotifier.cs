@@ -8,6 +8,7 @@ public interface ITenantNotifier
     Task BroadcastAsync(string eventName, object? data = null);
     Task BroadcastTableAsync(string tableNumber, string eventName, object? data = null);
     Task BroadcastTenantAsync(string tenantCode, string eventName, object? data = null);
+    Task BroadcastAllAsync(string eventName, object? data = null);
 }
 
 public class TenantNotifier : ITenantNotifier
@@ -64,4 +65,17 @@ public class TenantNotifier : ITenantNotifier
             await _hub.Clients.Group(group).SendAsync(eventName);
         }
     }
+
+    public async Task BroadcastAllAsync(string eventName, object? data = null)
+    {
+        if (data != null)
+        {
+            await _hub.Clients.All.SendAsync(eventName, data);
+        }
+        else
+        {
+            await _hub.Clients.All.SendAsync(eventName);
+        }
+    }
 }
+

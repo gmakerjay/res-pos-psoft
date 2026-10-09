@@ -294,6 +294,19 @@ public partial class MainWindow : Window
             });
         };
 
+        _realtime.ForceSyncReceived += () =>
+        {
+            Dispatcher.Invoke(async () =>
+            {
+                await RefreshLiveOrdersAsync();
+                await RefreshReportsAsync();
+                await LoadCategoriesAndProductsAsync();
+                await LoadIngredientsAsync();
+                await LoadTablesSettingsAsync();
+                UpdateTableButtonsVisuals();
+            });
+        };
+
         _ = _realtime.StartAsync();
     }
 
@@ -1301,17 +1314,13 @@ public partial class MainWindow : Window
         if (_liveOrders == null || GridLiveOrders == null) return;
 
         List<OrderDto> filtered;
-        if (RbFilterNew?.IsChecked == true)
+        if (RbFilterAccepted?.IsChecked == true)
         {
-            filtered = _liveOrders.Where(o => o.Status == OrderStatus.New).ToList();
-        }
-        else if (RbFilterCooking?.IsChecked == true)
-        {
-            filtered = _liveOrders.Where(o => o.Status == OrderStatus.Accepted || o.Status == OrderStatus.Preparing).ToList();
+            filtered = _liveOrders.Where(o => o.Status == OrderStatus.New || o.Status == OrderStatus.Accepted).ToList();
         }
         else if (RbFilterReady?.IsChecked == true)
         {
-            filtered = _liveOrders.Where(o => o.Status == OrderStatus.Ready).ToList();
+            filtered = _liveOrders.Where(o => o.Status == OrderStatus.Preparing || o.Status == OrderStatus.Ready).ToList();
         }
         else if (RbFilterCompleted?.IsChecked == true)
         {
@@ -1405,7 +1414,7 @@ public partial class MainWindow : Window
     {
         if (sender is Button btn && btn.Tag is int orderId)
         {
-            await ExecuteOrderStatusUpdateAsync(btn, orderId, OrderStatus.Ready, "ปรุงเสร็จแล้ว");
+            await ExecuteOrderStatusUpdateAsync(btn, orderId, OrderStatus.Ready, "เปลี่ยนสถานะเป็น [รอเสิร์ฟ] เรียบร้อยแล้ว");
         }
     }
 
@@ -1413,7 +1422,7 @@ public partial class MainWindow : Window
     {
         if (sender is Button btn && btn.Tag is int orderId)
         {
-            await ExecuteOrderStatusUpdateAsync(btn, orderId, OrderStatus.Completed, "เสิร์ฟแล้ว");
+            await ExecuteOrderStatusUpdateAsync(btn, orderId, OrderStatus.Completed, "เปลี่ยนสถานะเป็น [เสิร์ฟแล้ว] เรียบร้อยแล้ว");
         }
     }
 
@@ -2052,6 +2061,11 @@ public partial class MainWindow : Window
 
                 GridTopProducts.ItemsSource = null;
                 GridTopProducts.ItemsSource = report.TopProducts;
+
+                if (TxtReportLastSync != null)
+                {
+                    TxtReportLastSync.Text = $" - อัปเดตสดล่าสุด: {DateTime.Now:HH:mm:ss}";
+                }
             }
         }
         catch (Exception ex)

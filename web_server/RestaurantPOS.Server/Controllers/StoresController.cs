@@ -18,6 +18,7 @@ public class StoresController : ControllerBase
     private readonly AppDbContext _db;
     private readonly IPosPresenceTracker _presenceTracker;
     private readonly ITenantNotifier _notifier;
+    private readonly RestaurantPOS.Server.Settings.PlatformSettings _platformSettings;
     private readonly ILogger<StoresController> _logger;
 
     public StoresController(
@@ -26,6 +27,7 @@ public class StoresController : ControllerBase
         AppDbContext db,
         IPosPresenceTracker presenceTracker,
         ITenantNotifier notifier,
+        Microsoft.Extensions.Options.IOptions<RestaurantPOS.Server.Settings.PlatformSettings> platformSettings,
         ILogger<StoresController> logger)
     {
         _tenantService = tenantService;
@@ -33,17 +35,59 @@ public class StoresController : ControllerBase
         _db = db;
         _presenceTracker = presenceTracker;
         _notifier = notifier;
+        _platformSettings = platformSettings.Value;
         _logger = logger;
     }
 
+    [HttpGet("mode")]
+    public ActionResult<ApiResponse<PlatformModeDto>> GetPlatformMode([FromQuery] string? mode)
+    {
+        var isStandalone = mode?.Equals("standalone", StringComparison.OrdinalIgnoreCase) == true ||
+                           Request.Headers["X-Request-Mode"].ToString().Equals("standalone", StringComparison.OrdinalIgnoreCase) ||
+                           Request.Headers["Referer"].ToString().Contains("/standalone", StringComparison.OrdinalIgnoreCase) ||
+                           _platformSettings.ServerMode.Equals("Standalone", StringComparison.OrdinalIgnoreCase);
+
+        if (isStandalone)
+        {
+            return Ok(ApiResponse<PlatformModeDto>.Ok(new PlatformModeDto
+            {
+                ServerMode = "Standalone",
+                AllowStoreRegistration = false,
+                StandaloneRPOSCode = !string.IsNullOrWhiteSpace(_platformSettings.StandaloneRPOSCode)
+                    ? _platformSettings.StandaloneRPOSCode
+                    : "RPOS-DEMO-0001"
+            }));
+        }
+
+        return Ok(ApiResponse<PlatformModeDto>.Ok(new PlatformModeDto
+        {
+            ServerMode = _platformSettings.ServerMode,
+            AllowStoreRegistration = _platformSettings.AllowStoreRegistration,
+            StandaloneRPOSCode = _platformSettings.StandaloneRPOSCode
+        }));
+    }
+
     [HttpPost("register")]
-    public async Task<ActionResult<ApiResponse<TenantDto>>> RegisterStore([FromBody] RegisterTenantRequest request)
+    public async Task<ActionResult<ApiResponse<TenantDto>>> RegisterStore([FromBody] RegisterTenantRequest request, [FromQuery] string? mode)
     {
         try
         {
+            var isStandalone = mode?.Equals("standalone", StringComparison.OrdinalIgnoreCase) == true ||
+                               Request.Headers["X-Request-Mode"].ToString().Equals("standalone", StringComparison.OrdinalIgnoreCase) ||
+                               Request.Headers["Referer"].ToString().Contains("/standalone", StringComparison.OrdinalIgnoreCase) ||
+                               !_platformSettings.AllowStoreRegistration || 
+                               _platformSettings.ServerMode.Equals("Standalone", StringComparison.OrdinalIgnoreCase);
+
+            if (isStandalone)
+            {
+                return StatusCode(403, ApiResponse<TenantDto>.Fail(
+                    "ระบบนี้เป็นเวอร์ชันร้านเดี่ยว (Standalone Turnkey Edition) ปิดการลงทะเบียนเปิดร้านใหม่",
+                    ErrorCodes.Forbidden));
+            }
+
             if (string.IsNullOrWhiteSpace(request.StoreCode) || string.IsNullOrWhiteSpace(request.StoreName))
             {
-                return BadRequest(ApiResponse<TenantDto>.Fail("กรุณากรอกรหัสร้านค้าและชื่อร้านค้า", ErrorCodes.ValidationError));
+                return BadRequest(ApiResponse<TenantDto>.Fail("กรุณากรอกรหัส RPOS Code และชื่อร้านค้า", ErrorCodes.ValidationError));
             }
 
             var result = await _tenantService.RegisterTenantAsync(request);

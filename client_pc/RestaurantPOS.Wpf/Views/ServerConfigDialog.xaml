@@ -36,8 +36,8 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="รหัสร้านค้า (Store Code): *" FontWeight="Bold" FontSize="12" Foreground="#0D47A1"/>
-                        <TextBlock Text="รหัสที่ได้จากการลงทะเบียน" FontSize="9.5" Foreground="#666666"/>
+                        <TextBlock Text="รหัส RPOS (RPOS Code): *" FontWeight="Bold" FontSize="12" Foreground="#0D47A1"/>
+                        <TextBlock Text="รหัสเชื่อมต่อร้านค้า (เช่น RPOS-XXXX-XXXX)" FontSize="9.5" Foreground="#666666"/>
                     </StackPanel>
                     <TextBox x:Name="TxtStoreCode" Grid.Column="1" Height="32" VerticalContentAlignment="Center" 
                              Padding="8,2" FontSize="14" FontFamily="Consolas" FontWeight="Bold" Foreground="#1565C0"

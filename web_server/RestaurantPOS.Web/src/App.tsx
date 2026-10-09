@@ -8,11 +8,11 @@ import {
   updateIngredient, deleteIngredient, adjustIngredientStock, getAuditLogs,
   getStoredTenantCode, setStoredTenantCode, getStoreInfo, registerStore, checkStore,
   simulateStoreStatus, isDevUnlocked, unlockDevMode, lockDevMode,
-  exportStoreBackup, downloadStoreBackup
+  exportStoreBackup, downloadStoreBackup, getPlatformMode
 } from './services/api';
 import type { 
   CategoryItem, ProductItem, IngredientItem, Order, CreateOrderPayload, 
-  AuthUser, AuditLogItem, StoreInfo
+  AuthUser, AuditLogItem, StoreInfo, PlatformMode
 } from './services/api';
 import { realtimeService } from './services/realtime';
 import type { ConnectionState } from './services/realtime';
@@ -28,6 +28,7 @@ import { TableQrManagerModal } from './components/TableQrManagerModal';
 import { ActivateLicenseModal } from './components/ActivateLicenseModal';
 import { TableReservationModal } from './components/TableReservationModal';
 import { TableManagerView } from './components/TableManagerView';
+import { DevActionPanelView } from './components/DevActionPanelView';
 
 // Initialize global logger error handlers
 initGlobalErrorHandlers();
@@ -61,6 +62,57 @@ export function App() {
   });
   const [showActivateLicenseModal, setShowActivateLicenseModal] = useState<boolean>(false);
 
+  // Platform & Server Mode State
+  const [platformMode, setPlatformMode] = useState<PlatformMode | null>(() => {
+    if (typeof window !== 'undefined') {
+      const isPathStandalone = window.location.pathname.toLowerCase().startsWith('/standalone') || 
+        new URLSearchParams(window.location.search).get('mode') === 'standalone';
+      if (isPathStandalone) {
+        return {
+          serverMode: 'Standalone',
+          allowStoreRegistration: false,
+          standaloneRPOSCode: 'RPOS-DEMO-0001'
+        };
+      }
+    }
+    return null;
+  });
+
+  const isStandalone = platformMode?.serverMode === 'Standalone' || platformMode?.allowStoreRegistration === false;
+
+  useEffect(() => {
+    const isPathStandalone = typeof window !== 'undefined' && 
+      (window.location.pathname.toLowerCase().startsWith('/standalone') || 
+       new URLSearchParams(window.location.search).get('mode') === 'standalone');
+
+    if (isPathStandalone) {
+      setPlatformMode({
+        serverMode: 'Standalone',
+        allowStoreRegistration: false,
+        standaloneRPOSCode: 'RPOS-DEMO-0001'
+      });
+      lockDevMode();
+      setIsDevMode(false);
+      setShowDevAuthModal(false);
+      setStoredTenantCode('RPOS-DEMO-0001');
+      return;
+    }
+
+    getPlatformMode()
+      .then(pm => {
+        setPlatformMode(pm);
+        if (pm.serverMode === 'Standalone') {
+          lockDevMode();
+          setIsDevMode(false);
+          setShowDevAuthModal(false);
+          if (pm.standaloneRPOSCode) {
+            setStoredTenantCode(pm.standaloneRPOSCode);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Developer Mode States & Access Control
   const [isDevMode, setIsDevMode] = useState<boolean>(() => isDevUnlocked());
   const [showDevAuthModal, setShowDevAuthModal] = useState<boolean>(false);
@@ -71,6 +123,9 @@ export function App() {
   // Keyboard shortcut listener (Ctrl+Alt+D or Ctrl+Shift+D) and URL param detection
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Standalone Turnkey Edition strictly disables DEV panel & shortcuts
+      if (platformMode?.serverMode === 'Standalone') return;
+
       if ((e.ctrlKey || e.metaKey) && (e.altKey || e.shiftKey) && (e.key === 'd' || e.key === 'D')) {
         e.preventDefault();
         if (isDevMode) {
@@ -83,7 +138,7 @@ export function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
 
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && platformMode?.serverMode !== 'Standalone') {
       const p = new URLSearchParams(window.location.search);
       if ((p.get('dev') === '1' || p.get('dev') === 'true' || p.get('mode') === 'dev') && !isDevUnlocked()) {
         setShowDevAuthModal(true);
@@ -91,9 +146,10 @@ export function App() {
     }
 
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDevMode]);
+  }, [isDevMode, platformMode]);
 
   const handleEasterEggClick = () => {
+    if (platformMode?.serverMode === 'Standalone') return;
     setVersionClickCount(prev => {
       const next = prev + 1;
       if (next >= 5) {
@@ -106,6 +162,10 @@ export function App() {
 
   const handleVerifyDevPin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (platformMode?.serverMode === 'Standalone') {
+      setDevAuthError('เซิร์ฟเวอร์นี้เป็นเวอร์ชัน Standalone ไม่เปิดให้เข้าถึง Developer Mode');
+      return;
+    }
     if (unlockDevMode(devAuthPin)) {
       setIsDevMode(true);
       setShowDevAuthModal(false);
@@ -125,17 +185,27 @@ export function App() {
   const [sessionParams] = useState(() => {
     if (typeof window === 'undefined') return { isCustomer: false, store: '', table: '', type: '' };
     const p = new URLSearchParams(window.location.search);
-    const store = (p.get('store') || p.get('shop') || p.get('tenant') || p.get('code') || '').trim().toUpperCase();
+    const isPathStandalone = window.location.pathname.toLowerCase().startsWith('/standalone') || p.get('mode') === 'standalone';
+    let store = (p.get('store') || p.get('shop') || p.get('tenant') || p.get('code') || '').trim().toUpperCase();
+    if (!store && isPathStandalone) {
+      store = 'RPOS-DEMO-0001';
+    }
     const table = (p.get('table') || '').trim().toUpperCase();
     const type = (p.get('type') || '').trim().toLowerCase();
     const demo = p.get('demo') === '1' || p.get('demo') === 'true' || p.get('view') === 'demo';
-    const isCustomer = Boolean(store || table || type === 'takeaway' || demo);
+    const isCustomer = isPathStandalone
+      ? Boolean((table || type === 'takeaway' || demo || p.get('view') === 'menu' || p.get('view') === 'qr') && store)
+      : Boolean(store || table || type === 'takeaway' || demo);
     return { isCustomer, store, table, type };
   });
 
   const [isDemoViewActive, setIsDemoViewActive] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const p = new URLSearchParams(window.location.search);
+    const isPathStandalone = window.location.pathname.toLowerCase().startsWith('/standalone') || p.get('mode') === 'standalone';
+    if (isPathStandalone) {
+      return Boolean(p.get('table') || p.get('type') === 'takeaway' || p.get('demo') === '1' || p.get('view') === 'demo' || p.get('view') === 'menu' || p.get('view') === 'qr');
+    }
     return Boolean(p.get('store') || p.get('table') || p.get('type') || p.get('demo') === '1' || p.get('view') === 'demo');
   });
 
@@ -241,7 +311,8 @@ export function App() {
         />
         {showLoginModal && (
           <LoginModal 
-            initialStoreCode={loginModalStoreCode}
+            initialStoreCode={loginModalStoreCode || platformMode?.standaloneRPOSCode}
+            platformMode={platformMode}
             onSuccess={handleLoginSuccess} 
             onClose={() => {
               setShowLoginModal(false);
@@ -297,53 +368,57 @@ export function App() {
             </div>
 
             <div className="pos-header-portal-actions">
-              <button
-                onClick={() => {
-                  setStoredTenantCode('DEFAULT');
-                  window.history.pushState({}, '', '/?store=DEFAULT&table=T01');
-                  setIsDemoViewActive(true);
-                }}
-                style={{
-                  backgroundColor: '#FFD54F',
-                  color: '#0D47A1',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                  whiteSpace: 'nowrap'
-                }}
-                title="เปิดดูหน้าร้านอาหารตัวอย่างเพื่อสาธิตการสั่งอาหารและใช้งานจริง"
-              >
-                [ ดูตัวอย่างระบบจริง (Live Demo) ]
-              </button>
+              {!isStandalone && (
+                <button
+                  onClick={() => {
+                    setStoredTenantCode('DEFAULT');
+                    window.history.pushState({}, '', '/?store=DEFAULT&table=T01');
+                    setIsDemoViewActive(true);
+                  }}
+                  style={{
+                    backgroundColor: '#FFD54F',
+                    color: '#0D47A1',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="เปิดดูหน้าร้านอาหารตัวอย่างเพื่อสาธิตการสั่งอาหารและใช้งานจริง"
+                >
+                  [ ดูตัวอย่างระบบจริง (Live Demo) ]
+                </button>
+              )}
+
+              {!isStandalone && (
+                <button
+                  onClick={() => {
+                    window.open('/?page=register', '_blank');
+                  }}
+                  style={{
+                    backgroundColor: '#00E676',
+                    color: '#004D40',
+                    border: 'none',
+                    padding: '6px 13px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="เปิดหน้าลงทะเบียนร้านค้าใหม่ในหน้าต่างใหม่"
+                >
+                  [ + ลงทะเบียนร้านค้า ]
+                </button>
+              )}
 
               <button
                 onClick={() => {
-                  window.open('/?page=register', '_blank');
-                }}
-                style={{
-                  backgroundColor: '#00E676',
-                  color: '#004D40',
-                  border: 'none',
-                  padding: '6px 13px',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                  whiteSpace: 'nowrap'
-                }}
-                title="เปิดหน้าลงทะเบียนร้านค้าใหม่ในหน้าต่างใหม่"
-              >
-                [ + ลงทะเบียนร้านค้า ]
-              </button>
-
-              <button
-                onClick={() => {
-                  setLoginModalStoreCode('');
+                  setLoginModalStoreCode(isStandalone ? (platformMode?.standaloneRPOSCode || 'RPOS-DEMO-0001') : '');
                   setShowLoginModal(true);
                 }}
                 style={{
@@ -458,10 +533,10 @@ export function App() {
               </div>
             </div>
 
-            {/* Row 2: Live Demo Switcher & Navigation Actions (Visible only in Dev Mode or Demo View) */}
-            {(isDevMode || isDemoViewActive) && (
+            {/* Row 2: Live Demo Switcher & Navigation Actions (Visible only in Dev Mode or Demo View, hidden in Standalone) */}
+            {((isDevMode && platformMode?.serverMode !== 'Standalone') || isDemoViewActive) && (
               <div className="pos-header-customer-row2">
-                {isDevMode && (
+                {isDevMode && platformMode?.serverMode !== 'Standalone' && (
                   <button
                     type="button"
                     onClick={handleToggleDemoOnline}
@@ -506,7 +581,8 @@ export function App() {
                   type="button"
                   onClick={() => {
                     setIsDemoViewActive(false);
-                    window.history.pushState({}, '', '/');
+                    const isStandalone = platformMode?.serverMode === 'Standalone' || window.location.pathname.toLowerCase().startsWith('/standalone');
+                    window.history.pushState({}, '', isStandalone ? '/standalone' : '/');
                   }}
                   style={{
                     backgroundColor: '#FFEB3B',
@@ -547,7 +623,11 @@ export function App() {
                 RESTAURANT POS
               </span>
               <div
-                onClick={() => setShowSwitchStoreModal(true)}
+                onClick={() => {
+                  if (platformMode?.serverMode !== 'Standalone') {
+                    setShowSwitchStoreModal(true);
+                  }
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -558,12 +638,12 @@ export function App() {
                   fontSize: '11.5px',
                   fontWeight: 'bold',
                   color: '#FFEB3B',
-                  cursor: 'pointer',
+                  cursor: platformMode?.serverMode === 'Standalone' ? 'default' : 'pointer',
                   whiteSpace: 'nowrap'
                 }}
-                title="คลิกเพื่อสลับร้านค้า"
+                title={platformMode?.serverMode === 'Standalone' ? 'ร้านค้านี้ (Standalone Package)' : 'คลิกเพื่อสลับร้านค้า'}
               >
-                <span>[ร้าน: {storeInfo ? storeInfo.storeName : getStoredTenantCode()}]</span>
+                <span>[ร้าน: {storeInfo ? storeInfo.storeName : (platformMode?.standaloneRPOSCode || getStoredTenantCode())}]</span>
               </div>
 
               {storeInfo && (
@@ -740,6 +820,7 @@ export function App() {
         }}>
           {!currentUser && !isCustomerSession && (
             <SoftwareLandingView
+              platformMode={platformMode}
               onOpenLogin={(code) => {
                 if (code) setLoginModalStoreCode(code);
                 setShowLoginModal(true);
@@ -752,11 +833,16 @@ export function App() {
                 setStoredTenantCode(st.storeCode);
               }}
               onEnterDemo={(tableOrType) => {
-                setStoredTenantCode('DEFAULT');
+                const isStandalone = platformMode?.serverMode === 'Standalone';
+                const targetStore = (isStandalone && platformMode?.standaloneRPOSCode)
+                  ? platformMode.standaloneRPOSCode
+                  : 'DEFAULT';
+                setStoredTenantCode(targetStore);
+                const pathPrefix = isStandalone ? '/standalone' : '';
                 if (tableOrType === 'takeaway') {
-                  window.history.pushState({}, '', '/?store=DEFAULT&type=takeaway');
+                  window.history.pushState({}, '', `${pathPrefix}/?store=${targetStore}&type=takeaway`);
                 } else {
-                  window.history.pushState({}, '', `/?store=DEFAULT&table=${tableOrType || 'T01'}`);
+                  window.history.pushState({}, '', `${pathPrefix}/?store=${targetStore}&table=${tableOrType || 'T01'}`);
                 }
                 setIsDemoViewActive(true);
               }}
@@ -769,9 +855,9 @@ export function App() {
               isStorePosOnline={isStorePosOnline}
               activePosTerminals={activePosTerminals}
               onToggleDemoOnline={handleToggleDemoOnline}
-              isDevMode={isDevMode}
+              isDevMode={isDevMode && platformMode?.serverMode !== 'Standalone'}
               onOpenLogin={() => {
-                setLoginModalStoreCode(getStoredTenantCode() || 'DEFAULT');
+                setLoginModalStoreCode(getStoredTenantCode() || (platformMode?.standaloneRPOSCode || 'DEFAULT'));
                 setShowLoginModal(true);
               }}
             />
@@ -782,22 +868,23 @@ export function App() {
               isStorePosOnline={isStorePosOnline}
               activePosTerminals={activePosTerminals}
               onToggleDemoOnline={handleToggleDemoOnline}
-              isDevMode={isDevMode}
+              isDevMode={isDevMode && platformMode?.serverMode !== 'Standalone'}
               onOpenLogin={() => {
-                setLoginModalStoreCode(getStoredTenantCode() || 'DEFAULT');
+                setLoginModalStoreCode(getStoredTenantCode() || (platformMode?.standaloneRPOSCode || 'DEFAULT'));
                 setShowLoginModal(true);
               }}
             />
           )}
           {currentUser && activeTab === 'kitchen' && <KitchenView />}
-          {currentUser && activeTab === 'manage' && <ManagementView />}
+          {currentUser && activeTab === 'manage' && <ManagementView isDevMode={isDevMode} platformMode={platformMode} />}
           {currentUser && activeTab === 'tables' && <TableManagerView storeInfo={storeInfo} />}
         </main>
 
         {/* Login Modal */}
         {showLoginModal && (
           <LoginModal 
-            initialStoreCode={loginModalStoreCode}
+            initialStoreCode={loginModalStoreCode || platformMode?.standaloneRPOSCode}
+            platformMode={platformMode}
             onSuccess={handleLoginSuccess} 
             onClose={() => {
               setShowLoginModal(false);
@@ -816,7 +903,7 @@ export function App() {
         )}
 
         {/* Register Store Modal */}
-        {showRegisterStoreModal && (
+        {showRegisterStoreModal && platformMode?.serverMode !== 'Standalone' && (
           <RegisterStoreModal
             onClose={() => setShowRegisterStoreModal(false)}
             onSuccess={(newStore) => {
@@ -829,7 +916,7 @@ export function App() {
         )}
 
         {/* Switch Store Modal */}
-        {showSwitchStoreModal && (
+        {showSwitchStoreModal && platformMode?.serverMode !== 'Standalone' && (
           <SwitchStoreModal
             currentCode={getStoredTenantCode()}
             onClose={() => setShowSwitchStoreModal(false)}
@@ -866,8 +953,8 @@ export function App() {
           />
         )}
 
-        {/* Floating Developer Mode Toolbar (Only visible when DEV Mode is active) */}
-        {isDevMode && (
+        {/* Floating Developer Mode Toolbar (Only visible when DEV Mode is active AND NOT Standalone) */}
+        {isDevMode && platformMode?.serverMode !== 'Standalone' && (
           <div style={{
             position: 'fixed',
             bottom: '16px',
@@ -938,8 +1025,8 @@ export function App() {
           </div>
         )}
 
-        {/* Developer Mode PIN Verification Modal */}
-        {showDevAuthModal && (
+        {/* Developer Mode PIN Verification Modal (Strictly disabled in Standalone Mode) */}
+        {showDevAuthModal && platformMode?.serverMode !== 'Standalone' && (
           <div style={{
             position: 'fixed',
             inset: 0,
@@ -3367,14 +3454,18 @@ function KitchenView() {
 // -------------------------------------------------------------
 // 3. Management, Menu & Reports View
 // -------------------------------------------------------------
-function ManagementView() {
-  const [subTab, setSubTab] = useState<'sales' | 'menu' | 'stock' | 'audit' | 'backup'>('sales');
+function ManagementView({ isDevMode = false, platformMode }: { isDevMode?: boolean; platformMode?: PlatformMode | null }) {
+  const isStandalone = platformMode?.serverMode === 'Standalone';
+  const showDevTab = isDevMode && !isStandalone;
+  const [subTab, setSubTab] = useState<'sales' | 'menu' | 'stock' | 'audit' | 'backup' | 'dev'>('sales');
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
         <h2 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>
-          ระบบจัดการร้านและหลังบ้าน (Store Management &amp; Settings)
+          {isStandalone 
+            ? 'ระบบจัดการร้านและหลังบ้าน (Store Management)' 
+            : 'ระบบจัดการร้านและหลังบ้าน (Store Management & Settings)'}
         </h2>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
@@ -3478,6 +3569,25 @@ function ManagementView() {
         >
           สำรองข้อมูล &amp; ส่งออก (Backup &amp; Export)
         </button>
+
+        {showDevTab && (
+          <button
+            onClick={() => setSubTab('dev')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '4px',
+              border: 'none',
+              backgroundColor: subTab === 'dev' ? '#6A1B9A' : '#EDE7F6',
+              color: subTab === 'dev' ? '#FFF' : '#4A148C',
+              fontWeight: 'bold',
+              fontSize: '13px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            [ โหมดนักพัฒนา (DEV Action Panel) ]
+          </button>
+        )}
       </div>
 
       {subTab === 'sales' && <SalesDashboardView />}
@@ -3485,6 +3595,7 @@ function ManagementView() {
       {subTab === 'stock' && <StockManagementView />}
       {subTab === 'audit' && <AuditLogManagementView />}
       {subTab === 'backup' && <BackupManagementView />}
+      {subTab === 'dev' && showDevTab && <DevActionPanelView />}
     </div>
   );
 }
@@ -5576,10 +5687,13 @@ interface LoginModalProps {
   onSuccess: (user: AuthUser) => void;
   onClose: () => void;
   onOpenActivateLicense?: () => void;
+  platformMode?: PlatformMode | null;
 }
 
-function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicense }: LoginModalProps) {
-  const [storeCode, setStoreCode] = useState<string>(() => initialStoreCode || getStoredTenantCode());
+function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicense, platformMode }: LoginModalProps) {
+  const isStandalone = platformMode?.serverMode === 'Standalone';
+  const standaloneTarget = platformMode?.standaloneRPOSCode || initialStoreCode || getStoredTenantCode() || 'DEFAULT';
+  const [storeCode, setStoreCode] = useState<string>(() => isStandalone ? standaloneTarget : (initialStoreCode || getStoredTenantCode() || ''));
   const [username, setUsername] = useState<string>('admin');
   const [password, setPassword] = useState<string>('psoft123');
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -5589,21 +5703,23 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
     setIsLoggingIn(true);
     setErrorMsg('');
     try {
-      setStoreCode('DEFAULT');
+      const targetStore = isStandalone ? standaloneTarget : 'DEFAULT';
+      setStoreCode(targetStore);
       setUsername('admin');
       setPassword('psoft123');
-      setStoredTenantCode('DEFAULT');
-      const res = await login('admin', 'psoft123');
+      setStoredTenantCode(targetStore);
+      const res = await login('admin', 'psoft123', targetStore);
       onSuccess(res.user);
     } catch (err: any) {
-      setErrorMsg(err.message || 'ไม่สามารถเข้าสู่ระบบร้านตัวอย่างได้');
+      setErrorMsg(err.message || 'ไม่สามารถเข้าสู่ระบบร้านค้าได้');
     } finally {
       setIsLoggingIn(false);
     }
   };
 
   const handleFillDemo = () => {
-    setStoreCode('DEFAULT');
+    const targetStore = isStandalone ? standaloneTarget : 'DEFAULT';
+    setStoreCode(targetStore);
     setUsername('admin');
     setPassword('psoft123');
     setErrorMsg('');
@@ -5619,7 +5735,7 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
     setIsLoggingIn(true);
     setErrorMsg('');
     try {
-      const targetStore = storeCode.trim().toUpperCase() || 'DEFAULT';
+      const targetStore = isStandalone ? standaloneTarget : (storeCode.trim().toUpperCase() || 'DEFAULT');
       setStoredTenantCode(targetStore);
       const res = await login(username.trim(), password.trim(), targetStore);
       onSuccess(res.user);
@@ -5649,13 +5765,13 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
         boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
       }}>
         <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '6px', color: '#0D47A1' }}>
-          เข้าสู่ระบบร้านค้า (Store Login)
+          {isStandalone ? `เข้าสู่ระบบร้านค้า (${standaloneTarget})` : 'เข้าสู่ระบบร้านค้า (Store Login)'}
         </h3>
         <p style={{ fontSize: '12px', color: '#666', marginBottom: '14px' }}>
           เข้าสู่ระบบเพื่อจัดการเมนูอาหาร สต็อกวัตถุดิบ หรือเข้าใช้งานจอครัว (KDS)
         </p>
 
-        {/* Quick 1-Click Demo Login Box */}
+        {/* Quick 1-Click Login Box */}
         <div style={{
           backgroundColor: '#E8F5E9',
           border: '1.5px solid #81C784',
@@ -5665,7 +5781,7 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1B5E20' }}>
-              [ ร้านค้าตัวอย่างระบบ (DEFAULT Demo) ]
+              {isStandalone ? `[ ร้านค้าประจำระบบ (${standaloneTarget}) ]` : '[ ร้านค้าตัวอย่างระบบ (DEFAULT Demo) ]'}
             </span>
             <button
               type="button"
@@ -5701,7 +5817,7 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
               boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
             }}
           >
-            {isLoggingIn ? 'กำลังเข้าสู่ระบบ...' : '[ เข้าสู่ระบบร้านตัวอย่างทันที (1-Click Demo Login) ]'}
+            {isLoggingIn ? 'กำลังเข้าสู่ระบบ...' : (isStandalone ? '[ เข้าสู่ระบบร้านค้านี้ทันที (1-Click Login) ]' : '[ เข้าสู่ระบบร้านตัวอย่างทันที (1-Click Demo Login) ]')}
           </button>
           <div style={{ fontSize: '11px', color: '#2E7D32', marginTop: '6px', textAlign: 'center' }}>
             รหัสเริ่มต้น: ผู้ใช้ <strong>admin</strong> | รหัสผ่าน <strong>psoft123</strong> (หรือ 123456)
@@ -5729,26 +5845,31 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
               <label style={{ fontSize: '13px', fontWeight: 600 }}>
                 รหัสร้านค้า (Store Code / Security Key):
               </label>
-              <button
-                type="button"
-                onClick={() => setStoreCode('DEFAULT')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#1565C0',
-                  fontSize: '11.5px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                [ใช้ DEFAULT]
-              </button>
+              {!isStandalone && (
+                <button
+                  type="button"
+                  onClick={() => setStoreCode('DEFAULT')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#1565C0',
+                    fontSize: '11.5px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  [ใช้ DEFAULT]
+                </button>
+              )}
             </div>
             <input
               type="text"
-              placeholder="เช่น DEFAULT, SHOP1234"
-              value={storeCode}
-              onChange={(e) => setStoreCode(e.target.value.toUpperCase())}
+              placeholder="เช่น DEFAULT หรือ RPOS-XXXX-XXXX"
+              value={isStandalone ? standaloneTarget : storeCode}
+              readOnly={isStandalone}
+              onChange={(e) => {
+                if (!isStandalone) setStoreCode(e.target.value.toUpperCase());
+              }}
               style={{
                 width: '100%',
                 padding: '8px 12px',
@@ -5757,12 +5878,16 @@ function LoginModal({ initialStoreCode, onSuccess, onClose, onOpenActivateLicens
                 fontSize: '14px',
                 fontFamily: 'monospace',
                 fontWeight: 'bold',
-                color: '#1565C0'
+                color: '#1565C0',
+                backgroundColor: isStandalone ? '#F0F4F8' : '#FFF',
+                cursor: isStandalone ? 'not-allowed' : 'text'
               }}
             />
-            <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>
-              * รหัสร้านค้าตัวอย่างคือ <strong>DEFAULT</strong> หรือกรอกรหัสร้านค้าที่คุณสร้างขึ้น
-            </div>
+            {!isStandalone && (
+              <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>
+                * รหัสร้านค้าตัวอย่างคือ <strong>DEFAULT</strong> หรือกรอกรหัสร้านค้าที่คุณสร้างขึ้น
+              </div>
+            )}
           </div>
 
           <div style={{ marginBottom: '14px' }}>

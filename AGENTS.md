@@ -59,4 +59,13 @@
    - ให้ระบุเป็น `เวอร์ชัน 1.0 (แก้ไขครั้งที่ ...)` โดยเริ่มที่เวอร์ชัน 1.0 เสมอ
    - ห้ามเปลี่ยนเลขเวอร์ชันหลัก (ห้ามขึ้นเป็น v1.1, v2.0 เอง) จนกว่าผู้ใช้จะสั่งเปลี่ยนเด็ดขาด
 
+9. **สถาปัตยกรรมสองโมเดลธุรกิจ (Dual Commercial Architecture):**
+   - **ส่วนที่เราดูแล (Platform SaaS Hub: `https://spk.p-services.net/`):** รองรับ Multi-Tenant, เปิดรับลงทะเบียนร้านค้าใหม่ (`/api/stores/register`), และมี Active Sessions Monitor กับ DEV Action Panel (`/api/dev/*`) สำหรับทีมวิศวกรดูแลระบบ
+   - **ส่วนขายเดี่ยวลง VPS เอง (Standalone Turnkey Edition: `https://spk.p-services.net/standalone`):** ล็อกตรงเข้าสู่ร้านค้าเดี่ยว `RPOS-DEMO-0001` (Single-Store Mode), บล็อกการลงทะเบียนร้านค้าใหม่ 100% (403 Forbidden ป้องกันลูกค้านำไปเปิดแพลตฟอร์มแข่ง), บล็อก DEV Tools/API 100% (403 Forbidden), และต้องไร้ศัพท์เทคนิคหรือปุ่มสลับระบบ 100%
+
+10. **ความปลอดภัยของฐานข้อมูลและเซิร์ฟเวอร์ (Zero-Damage Server Safety):**
+    - ในการรีเซ็ตฐานข้อมูลหรือ Deploy จะต้องรักษาฐานข้อมูล `DEFAULT.db`, `RPOS-DEMO-0001.db`, และ `master.db` เสมอ ห้ามลบ `RPOS-DEMO-0001.db` หรือตัดออกจาก `master.db` โดยเด็ดขาด
+    - เซิร์ฟเวอร์ Linux (`192.168.1.247`) รันบริการ PM2 อื่นๆ ของระบบ (`pcom-web`, `supon_keawsri`, `pcom-spk`, `pcom-finance`, `pcom-storage`) ห้ามรันคำสั่งที่ส่งผลกระทบหรือหยุดการทำงานของบริการเหล่านี้โดยเด็ดขาด
+
+
 

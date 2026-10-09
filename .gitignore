@@ -25,7 +25,10 @@ deploylocal/
 
 # Remote Deployment & SSH Credentials (Local Machine Only)
 *deploy_remote*.py
+deploy_standalone.py
+update_both_remote.py
 temp_deploy.tar.gz
+temp_update.tar.gz
 *.tar.gz
 *.pem
 *.key
@@ -33,6 +36,7 @@ temp_deploy.tar.gz
 *.ppk
 .env*
 deploy_secrets/
+user.md
 
 # Databases & Runtime Logs
 *.db

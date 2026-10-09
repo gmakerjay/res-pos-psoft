@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { StoreInfo } from '../services/api';
+import type { StoreInfo, PlatformMode } from '../services/api';
 import { getServerUrl } from '../services/logger';
 
 interface SoftwareLandingViewProps {
@@ -7,10 +7,13 @@ interface SoftwareLandingViewProps {
   onStoreCreated?: (store: StoreInfo) => void;
   onEnterDemo?: (tableOrType?: string) => void;
   onOpenRegister?: () => void;
+  platformMode?: PlatformMode | null;
 }
 
-export function SoftwareLandingView({ onOpenLogin, onEnterDemo, onOpenRegister }: SoftwareLandingViewProps) {
+export function SoftwareLandingView({ onOpenLogin, onEnterDemo, onOpenRegister, platformMode }: SoftwareLandingViewProps) {
   const [copiedApiUrl, setCopiedApiUrl] = useState(false);
+  const isStandalone = platformMode?.serverMode === 'Standalone' || platformMode?.allowStoreRegistration === false;
+  const standaloneCode = platformMode?.standaloneRPOSCode || 'RPOS-DEMO-0001';
 
   const serverApiUrl = typeof window !== 'undefined' ? (getServerUrl() || window.location.origin) : 'https://spk.p-services.net';
 
@@ -48,22 +51,22 @@ export function SoftwareLandingView({ onOpenLogin, onEnterDemo, onOpenRegister }
         {/* Hero Section */}
         <section style={{
           textAlign: 'center',
-          padding: '32px 12px 24px 12px',
+          padding: '8px 12px 18px 12px',
           maxWidth: '860px',
           margin: '0 auto'
         }}>
           <div style={{
             display: 'inline-block',
-            backgroundColor: '#E3F2FD',
-            color: '#1565C0',
+            backgroundColor: isStandalone ? '#E8F5E9' : '#E3F2FD',
+            color: isStandalone ? '#2E7D32' : '#1565C0',
             padding: '4px 14px',
             borderRadius: '20px',
             fontSize: '12px',
             fontWeight: 'bold',
-            marginBottom: '14px',
-            border: '1px solid #BBDEFB'
+            marginBottom: '10px',
+            border: isStandalone ? '1px solid #C8E6C9' : '1px solid #BBDEFB'
           }}>
-            [ Windows Desktop POS &amp; Cloud Hub System ]
+            {isStandalone ? '[ ระบบสั่งอาหารและจัดการจุดขายประจำร้าน ]' : '[ ระบบบริหารจัดการร้านอาหารและจุดขาย POS หน้าร้าน ]'}
           </div>
 
           <h1 style={{
@@ -73,7 +76,7 @@ export function SoftwareLandingView({ onOpenLogin, onEnterDemo, onOpenRegister }
             lineHeight: '1.3',
             marginBottom: '12px'
           }}>
-            ระบบบริหารจัดการร้านอาหาร และจุดขาย POS หน้าร้าน
+            {isStandalone ? 'ระบบบริหารจัดการร้านอาหาร และจุดขาย POS ประจำร้าน' : 'ระบบบริหารจัดการร้านอาหาร และจุดขาย POS หน้าร้าน'}
           </h1>
 
           <p style={{
@@ -86,6 +89,30 @@ export function SoftwareLandingView({ onOpenLogin, onEnterDemo, onOpenRegister }
             ซอฟต์แวร์ขายหน้าร้านบน Windows สั่งพิมพ์สลิปและใบสั่งครัวอัตโนมัติ 
             พร้อมระบบ QR Code สั่งอาหารประจำโต๊ะ และจอแสดงออเดอร์ในครัว (KDS) เรียลไทม์
           </p>
+
+          {isStandalone && (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: '#E8F5E9',
+              border: '1.5px solid #81C784',
+              borderRadius: '8px',
+              padding: '8px 16px',
+              marginBottom: '20px',
+              fontSize: '13px',
+              color: '#1B5E20',
+              fontWeight: 'bold'
+            }}>
+              <span>รหัสร้านค้า:</span>
+              <span style={{ fontFamily: 'monospace', fontSize: '14px', color: '#0D47A1' }}>
+                {standaloneCode}
+              </span>
+              <span style={{ fontSize: '11px', backgroundColor: '#C8E6C9', padding: '2px 6px', borderRadius: '4px' }}>
+                [ระบบพร้อมใช้งาน]
+              </span>
+            </div>
+          )}
 
           {/* Feature Pills */}
           <div style={{
@@ -108,7 +135,7 @@ export function SoftwareLandingView({ onOpenLogin, onEnterDemo, onOpenRegister }
               [จอครัว KDS เรียลไทม์]
             </span>
             <span style={{ backgroundColor: '#E8F5E9', color: '#2E7D32', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
-              [ทดสอบผ่าน Cloud Server ฟรี]
+              {isStandalone ? '[เชื่อมต่อสด Real-Time]' : '[ทดสอบผ่าน Cloud Server ฟรี]'}
             </span>
           </div>
 
@@ -120,44 +147,116 @@ export function SoftwareLandingView({ onOpenLogin, onEnterDemo, onOpenRegister }
             flexWrap: 'wrap',
             marginBottom: '10px'
           }}>
-            <button
-              type="button"
-              onClick={handleOpenRegister}
-              style={{
-                backgroundColor: '#0D47A1',
-                color: '#FFF',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '8px',
-                fontSize: '15px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(13, 71, 161, 0.35)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              [ + ลงทะเบียนร้านค้าใหม่ (เปิดหน้าใหม่) ]
-            </button>
+            {isStandalone ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onEnterDemo ? onEnterDemo('T01') : (window.location.href = `/standalone?store=${standaloneCode}&table=T01`)}
+                  style={{
+                    backgroundColor: '#2E7D32',
+                    color: '#FFF',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(46, 125, 50, 0.35)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  [ สั่งอาหาร / ดูเมนูประจำร้าน (QR Menu) ]
+                </button>
 
-            <button
-              type="button"
-              onClick={() => onOpenLogin('DEFAULT')}
-              style={{
-                backgroundColor: '#FFF',
-                color: '#0D47A1',
-                border: '2px solid #0D47A1',
-                padding: '10px 20px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
-              }}
-            >
-              [ เข้าสู่ระบบร้านค้า ]
-            </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenLogin(standaloneCode)}
+                  style={{
+                    backgroundColor: '#0D47A1',
+                    color: '#FFF',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(13, 71, 161, 0.35)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  [ เข้าสู่ระบบแคชเชียร์ / จัดการร้าน ]
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleOpenRegister}
+                  style={{
+                    backgroundColor: '#0D47A1',
+                    color: '#FFF',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(13, 71, 161, 0.35)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  [ + ลงทะเบียนร้านค้าใหม่ (เปิดหน้าใหม่) ]
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onOpenLogin('DEFAULT')}
+                  style={{
+                    backgroundColor: '#2E7D32',
+                    color: '#FFF',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(46, 125, 50, 0.35)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  [ เข้าสู่ระบบร้านค้า ]
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = '/standalone'; }}
+                  style={{
+                    backgroundColor: '#E8F5E9',
+                    color: '#1B5E20',
+                    border: '1.5px solid #81C784',
+                    padding: '12px 20px',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(46, 125, 50, 0.15)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  [ ชมตัวอย่างระบบประจำร้านเดี่ยว (สำหรับติดตั้งบน VPS ส่วนตัว) ]
+                </button>
+              </>
+            )}
           </div>
         </section>
 
@@ -492,7 +591,7 @@ export function SoftwareLandingView({ onOpenLogin, onEnterDemo, onOpenRegister }
                   จอครัวอัจฉริยะ (Kitchen Display KDS)
                 </h3>
                 <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.6', margin: '0 0 14px 0' }}>
-                  จอแสดงรายการออเดอร์ในครัวแบบ SignalR Real-Time เด้งเตือนเสียงทันทีเมื่อมีออเดอร์ใหม่ แยกสเตชันครัว/บาร์น้ำ ปรุงเสร็จแตะเปลี่ยนสถานะ [กำลังปรุง] ถึง [พร้อมเสิร์ฟ]
+                  จอแสดงรายการออเดอร์ในครัวแบบ SignalR Real-Time เด้งเตือนเสียงทันทีเมื่อมีออเดอร์ใหม่ แยกสเตชันครัว/บาร์น้ำ แตะเปลี่ยนสถานะ 3 ขั้นตอน [รับออเดอร์] &gt; [รอเสิร์ฟ] &gt; [เสิร์ฟแล้ว]
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -590,15 +689,17 @@ export function SoftwareLandingView({ onOpenLogin, onEnterDemo, onOpenRegister }
             </div>
           </div>
 
-          {/* Quick Launch & Dedicated Registration Action Banner */}
+          {/* Quick Launch & Action Banner */}
           <div style={{
-            background: 'linear-gradient(135deg, #0D47A1 0%, #1565C0 100%)',
+            background: isStandalone
+              ? 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)'
+              : 'linear-gradient(135deg, #0D47A1 0%, #1565C0 100%)',
             color: '#FFF',
             borderRadius: '12px',
             padding: '28px 24px',
-            boxShadow: '0 8px 24px rgba(13, 71, 161, 0.25)',
+            boxShadow: isStandalone ? '0 8px 24px rgba(27, 94, 32, 0.25)' : '0 8px 24px rgba(13, 71, 161, 0.25)',
             textAlign: 'center',
-            border: '1px solid #1976D2'
+            border: isStandalone ? '1px solid #388E3C' : '1px solid #1976D2'
           }}>
             <div style={{
               display: 'inline-block',
@@ -610,67 +711,129 @@ export function SoftwareLandingView({ onOpenLogin, onEnterDemo, onOpenRegister }
               fontWeight: 'bold',
               marginBottom: '12px'
             }}>
-              [ เริ่มต้นเปิดร้านค้าของคุณวันนี้ ]
+              {isStandalone ? '[ ระบบจัดการจุดขายและสั่งอาหารประจำร้าน ]' : '[ เริ่มต้นเปิดร้านค้าของคุณวันนี้ ]'}
             </div>
 
             <h2 style={{ fontSize: 'clamp(20px, 4vw, 26px)', fontWeight: 800, margin: '0 0 8px 0', color: '#FFF' }}>
-              พร้อมยกระดับการบริหารจัดการร้านอาหารของคุณแล้วหรือยัง?
+              {isStandalone ? 'พร้อมให้บริการสั่งอาหารและเปิดโต๊ะขายหน้าร้าน' : 'พร้อมยกระดับการบริหารจัดการร้านอาหารของคุณแล้วหรือยัง?'}
             </h2>
 
             <p style={{ fontSize: '14px', color: '#BBDEFB', maxWidth: '640px', margin: '0 auto 20px auto', lineHeight: '1.6' }}>
-              ลงทะเบียนง่ายๆ ภายใน 1 นาที เพื่อรับรหัสร้านค้า (Store Code) พร้อมนำไปเชื่อมต่อและเปิดใช้งานโปรแกรมขายหน้าร้านบน Windows ได้ทันที
+              {isStandalone
+                ? 'เข้าใช้งานระบบแคชเชียร์ จัดการเมนู สต็อก หรือเริ่มสั่งอาหารผ่าน QR Code ได้ทันที ข้อมูลซิงค์สด Real-Time ทุกจุดขาย'
+                : 'ลงทะเบียนง่ายๆ ภายใน 1 นาที เพื่อรับรหัสร้านค้า (Store Code) พร้อมนำไปเชื่อมต่อและเปิดใช้งานโปรแกรมขายหน้าร้านบน Windows ได้ทันที'}
             </p>
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '22px' }}>
-              <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', padding: '5px 12px', borderRadius: '20px', fontSize: '12px' }}>
-                [ 1. ลงทะเบียนรับรหัสร้าน ]
-              </span>
-              <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', padding: '5px 12px', borderRadius: '20px', fontSize: '12px' }}>
-                [ 2. นำไอดี/พาสไปล็อกอิน ]
-              </span>
-              <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', padding: '5px 12px', borderRadius: '20px', fontSize: '12px' }}>
-                [ 3. เริ่มขายหน้าร้านได้ทันที ]
-              </span>
+              {isStandalone ? (
+                <>
+                  <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', padding: '5px 12px', borderRadius: '20px', fontSize: '12px' }}>
+                    [ 1. เปิดโปรแกรม POS บน Windows ]
+                  </span>
+                  <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', padding: '5px 12px', borderRadius: '20px', fontSize: '12px' }}>
+                    [ 2. สั่งอาหารโต๊ะ / QR Menu ]
+                  </span>
+                  <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', padding: '5px 12px', borderRadius: '20px', fontSize: '12px' }}>
+                    [ 3. จอครัว KDS & ปิดบิลสด ]
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', padding: '5px 12px', borderRadius: '20px', fontSize: '12px' }}>
+                    [ 1. ลงทะเบียนรับรหัสร้าน ]
+                  </span>
+                  <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', padding: '5px 12px', borderRadius: '20px', fontSize: '12px' }}>
+                    [ 2. นำไอดี/พาสไปล็อกอิน ]
+                  </span>
+                  <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', padding: '5px 12px', borderRadius: '20px', fontSize: '12px' }}>
+                    [ 3. เริ่มขายหน้าร้านได้ทันที ]
+                  </span>
+                </>
+              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', flexWrap: 'wrap', marginBottom: '20px' }}>
-              <button
-                type="button"
-                onClick={handleOpenRegister}
-                style={{
-                  backgroundColor: '#FFEB3B',
-                  color: '#0D47A1',
-                  border: 'none',
-                  padding: '14px 28px',
-                  borderRadius: '8px',
-                  fontSize: '15.5px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                [ + เปิดหน้าต่างลงทะเบียนร้านค้าใหม่ ]
-              </button>
+              {isStandalone ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onOpenLogin(standaloneCode)}
+                    style={{
+                      backgroundColor: '#FFEB3B',
+                      color: '#0D47A1',
+                      border: 'none',
+                      padding: '14px 28px',
+                      borderRadius: '8px',
+                      fontSize: '15.5px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    [ เข้าสู่ระบบแคชเชียร์ / จัดการร้าน ]
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => onOpenLogin('DEFAULT')}
-                style={{
-                  backgroundColor: 'transparent',
-                  color: '#FFF',
-                  border: '2px solid rgba(255,255,255,0.8)',
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
-                }}
-              >
-                [ เข้าสู่ระบบร้านค้า ]
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => onEnterDemo ? onEnterDemo('table1') : (window.location.href = `/?store=${standaloneCode}`)}
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: '#FFF',
+                      border: '2px solid rgba(255,255,255,0.8)',
+                      padding: '12px 24px',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    [ สั่งอาหารผ่าน QR Code ]
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleOpenRegister}
+                    style={{
+                      backgroundColor: '#FFEB3B',
+                      color: '#0D47A1',
+                      border: 'none',
+                      padding: '14px 28px',
+                      borderRadius: '8px',
+                      fontSize: '15.5px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    [ + เปิดหน้าต่างลงทะเบียนร้านค้าใหม่ ]
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenLogin('DEFAULT')}
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: '#FFF',
+                      border: '2px solid rgba(255,255,255,0.8)',
+                      padding: '12px 24px',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    [ เข้าสู่ระบบร้านค้า ]
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Connection API URL Info Box */}

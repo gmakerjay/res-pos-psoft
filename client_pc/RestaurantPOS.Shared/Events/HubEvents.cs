@@ -18,6 +18,8 @@ public static class HubEvents
     public const string SystemNotification = "SystemNotification";
     public const string StoreStatusChanged = "StoreStatusChanged";
     public const string OrderActionActivity = "OrderActionActivity";
+    public const string ForceSync = "ForceSync";
+    public const string SessionKicked = "SessionKicked";
 
     // Client-to-Server methods
     public const string JoinTableGroup = "JoinTableGroup";
@@ -25,5 +27,7 @@ public static class HubEvents
     public const string JoinRoleGroup = "JoinRoleGroup";
     public const string RegisterPos = "RegisterPos";
     public const string UnregisterPos = "UnregisterPos";
+    public const string RegisterSession = "RegisterSession";
     public const string NotifyOrderAction = "NotifyOrderAction";
+    public const string Heartbeat = "Heartbeat";
 }

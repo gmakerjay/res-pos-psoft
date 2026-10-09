@@ -127,9 +127,8 @@ with open(os.path.join(pkg_local, "README.txt"), "w", encoding="utf-8") as f:
     f.write(readme_content)
 
 # Copy to Desktop
-if os.path.exists(pkg_desktop):
-    shutil.rmtree(pkg_desktop)
-shutil.copytree(pkg_local, pkg_desktop)
+os.makedirs(pkg_desktop, exist_ok=True)
+shutil.copytree(pkg_local, pkg_desktop, dirs_exist_ok=True)
 
 print("SUCCESS: Package created and copied to Desktop!")
 print("Local path:", pkg_local)

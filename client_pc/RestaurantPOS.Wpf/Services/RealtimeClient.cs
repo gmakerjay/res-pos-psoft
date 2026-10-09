@@ -18,6 +18,7 @@ public class RealtimeClient : IAsyncDisposable
     public event Action<CategoryDto>? CategoryUpdated;
     public event Action<IngredientDto>? IngredientUpdated;
     public event Action<OrderActionActivityDto>? OrderActionActivityReceived;
+    public event Action? ForceSyncReceived;
 
     public bool IsConnected => _hub?.State == HubConnectionState.Connected;
 
@@ -124,6 +125,12 @@ public class RealtimeClient : IAsyncDisposable
             {
                 PosLogger.Info($"[SignalR Event] Order Action Activity: {activity.ActionDescription}");
                 OrderActionActivityReceived?.Invoke(activity);
+            });
+
+            _hub.On(HubEvents.ForceSync, () =>
+            {
+                PosLogger.Info("[SignalR Event] Force Sync signal received from server");
+                ForceSyncReceived?.Invoke();
             });
 
             await _hub.StartAsync();

@@ -42,7 +42,20 @@ public class PosHub : Hub
         var tenantGroupName = $"tenant_{tenantCode}";
         await Groups.AddToGroupAsync(Context.ConnectionId, tenantGroupName);
 
-        _logger.LogInformation("[SignalR] Client connected: {ConnectionId} (Store: {TenantCode})", Context.ConnectionId, tenantCode);
+        // Extract client session metadata
+        var clientType = http?.Request.Query["type"].ToString();
+        if (string.IsNullOrWhiteSpace(clientType))
+        {
+            clientType = "Web App";
+        }
+        var username = http?.Request.Query["user"].ToString() ?? Context.User?.Identity?.Name ?? "ผู้ใช้งาน";
+        var userAgent = http?.Request.Headers["User-Agent"].ToString() ?? "Unknown Client";
+        var ipAddress = http?.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+
+        _presenceTracker.RegisterSession(Context.ConnectionId, tenantCode, clientType, username, userAgent, ipAddress);
+
+        _logger.LogInformation("[SignalR] Client connected: {ConnectionId} (Store: {TenantCode}, Type: {Type}, User: {User})", 
+            Context.ConnectionId, tenantCode, clientType, username);
         await base.OnConnectedAsync();
     }
 
@@ -145,5 +158,21 @@ public class PosHub : Hub
         _logger.LogInformation("[SignalR] Order Action Activity from {Source} by {Operator}: {Description}", 
             action.Source, action.OperatorName, action.ActionDescription);
         await _notifier.BroadcastTenantAsync(tenantCode, HubEvents.OrderActionActivity, action);
+    }
+
+    public async Task Heartbeat()
+    {
+        _presenceTracker.UpdateHeartbeat(Context.ConnectionId);
+        await Task.CompletedTask;
+    }
+
+    public async Task RegisterSession(string clientType, string? username)
+    {
+        var tenantCode = Context.Items["TenantCode"]?.ToString() ?? "DEFAULT";
+        var http = Context.GetHttpContext();
+        var userAgent = http?.Request.Headers["User-Agent"].ToString() ?? "Web Client";
+        var ipAddress = http?.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+        _presenceTracker.RegisterSession(Context.ConnectionId, tenantCode, clientType, username, userAgent, ipAddress);
+        await Task.CompletedTask;
     }
 }

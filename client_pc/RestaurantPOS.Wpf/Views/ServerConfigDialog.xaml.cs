@@ -115,7 +115,7 @@ public partial class ServerConfigDialog : Window
 
         if (string.IsNullOrWhiteSpace(storeCode))
         {
-            MessageBox.Show("กรุณากรอกรหัสร้านค้า (เช่น DEFAULT หรือ SHOP01)", "แจ้งเตือน", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("กรุณากรอกรหัส RPOS Code (เช่น DEFAULT หรือ RPOS-XXXX-XXXX)", "แจ้งเตือน", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 

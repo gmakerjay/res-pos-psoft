@@ -322,11 +322,9 @@ public class OrdersController : ControllerBase
         var sourceName = !string.IsNullOrWhiteSpace(req.Source) ? req.Source : "POS";
         var newBadge = req.Status switch
         {
-            OrderStatus.New => "[ออเดอร์ใหม่]",
-            OrderStatus.Accepted => "[รับออเดอร์แล้ว]",
-            OrderStatus.Preparing => "[กำลังปรุง]",
-            OrderStatus.Ready => "[ปรุงเสร็จแล้ว]",
-            OrderStatus.Completed => "[เสร็จสิ้น]",
+            OrderStatus.New or OrderStatus.Accepted => "[รับออเดอร์]",
+            OrderStatus.Preparing or OrderStatus.Ready => "[รอเสิร์ฟ]",
+            OrderStatus.Completed => "[เสิร์ฟแล้ว]",
             OrderStatus.Cancelled => "[ยกเลิก]",
             _ => req.Status.ToString()
         };

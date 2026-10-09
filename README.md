@@ -41,9 +41,20 @@
 res-pos_psoft/
 ├── web_server/                         # [ส่วนที่ 1] ซอสฝั่งเว็บและเซิร์ฟเวอร์กลาง (พร้อม Deploy บน Linux)
 │   ├── RestaurantPOS.Server/           # ASP.NET Core 10 Web API + SignalR Hubs + EF Core
+│   │   ├── Controllers/                # REST Controllers (Orders, Products, Stores, Dev, Backup)
+│   │   ├── Hubs/                       # SignalR Hubs (PosHub สำหรับซิงค์สด 2 ทิศทาง)
+│   │   ├── Tenancy/                    # Multi-Tenant Engine, PosPresenceTracker, TenantNotifier
+│   │   └── wwwroot/                    # โฟลเดอร์ Static Assets และ Web SPA บิลด์แล้ว
 │   ├── RestaurantPOS.Web/              # Vite + React 19 + TypeScript (Customer QR & Management)
+│   │   ├── src/components/             # Landing, Register, TableManager, KDS, ActiveSessions, DevPanel
+│   │   └── src/services/               # API Clients, Real-time SignalR, Logger
 │   ├── RestaurantPOS.Shared/           # Shared Class Library (.NET 10 DTOs, Enums, Models)
-│   ├── deploy_linux/                   # เครื่องมือและคอนฟิกสำหรับ Deploy บน Linux (Systemd, Nginx, Docker)
+│   ├── deploy_linux/                   # เครื่องมือและคอนฟิกสำหรับ Deploy บน Linux
+│   │   ├── deploy_remote.py            # สคริปต์อัตโนมัติ SFTP Deploy ไปยัง Linux Production (192.168.1.247)
+│   │   ├── restaurantpos.service       # Systemd background service unit (Port 3000)
+│   │   ├── nginx.conf                  # Nginx reverse proxy configuration
+│   │   ├── Dockerfile                  # Multi-stage Docker build
+│   │   └── deploy_linux.sh             # Linux automated setup script
 │   ├── RestaurantPOS.WebServer.slnx    # Solution แยกสำหรับงาน Web & Server
 │   ├── run_server.bat                  # รัน Central Server บน Windows
 │   ├── run_web.bat                     # รัน Vite Web Dev Server
@@ -51,6 +62,9 @@ res-pos_psoft/
 │
 ├── client_pc/                          # [ส่วนที่ 2] ซอสฝั่ง Client PC Software (เครื่องแคชเชียร์หน้าร้าน)
 │   ├── RestaurantPOS.Wpf/              # C# .NET 10 WPF Desktop POS (Classic Windows XP Theme)
+│   │   ├── Views/                      # Windows, Dialogs (OrderDetails, ServerConfig, ErrorDialog)
+│   │   ├── Services/                   # ApiClient, RealtimeClient, SoundPlayer, AssetSyncService
+│   │   └── Licensing/                  # Hardware-Bound RSA-2048 Verification Engine
 │   ├── RestaurantPOS.Shared/           # Shared Class Library (.NET 10)
 │   ├── RestaurantPOS.Client.slnx       # Solution แยกสำหรับงาน Windows Desktop POS
 │   ├── run_pos.bat                     # รันหรือบิลด์โปรแกรม Desktop POS ทันที
@@ -59,9 +73,15 @@ res-pos_psoft/
 ├── tools/                              # [ส่วนพิเศษ] เครื่องมือนักพัฒนา (Developer Only - เก็บส่วนตัว)
 │   └── RestaurantPOS.KeyGen/           # โปรแกรมออกคีย์ลิขสิทธิ์ผูกฮาร์ดแวร์ (RSA-2048 Asymmetric Signature)
 │
-├── build_output/                       # [ส่วนที่ 3] โฟลเดอร์โปรแกรมที่บิลด์ออกมาแล้ว (รอคำสั่ง Deploy)
+├── tests/                              # [ส่วนที่ 4] ชุดทดสอบอัตโนมัติ TDD แบบครบวงจร (27/27 Tests Passed)
+│   └── RestaurantPOS.Tests/            # xUnit + ASP.NET Core TestServer + SignalR Test Clients
+│
+├── build_output/                       # [ส่วนที่ 5] โฟลเดอร์โปรแกรมที่บิลด์ออกมาแล้ว (รอคำสั่ง Deploy)
 │   ├── client_pc/                      # ไฟล์บิลด์ตัวเต็มของ Windows Desktop POS (Psoft-RES Online.exe)
 │   └── web_server/                     # ไฟล์บิลด์ตัวเต็มของ Central Server + Web SPA ใน wwwroot
+│
+├── .agents/skills/                     # [Skills] คู่มือแนวทางการทำงานของ AI Agent ประจำโครงการ
+│   └── restaurantpos-guide/            # Master Agent Guideline, Architecture & Deployment Rules
 │
 ├── RestaurantPOS.slnx                  # Master Solution File รวมทุกโปรเจกต์
 ├── run.bat                             # Master Quick Launcher เมนูลัดสำหรับรันทั้งระบบ
@@ -71,6 +91,29 @@ res-pos_psoft/
 ├── run_web.bat                         # ลัดเปิดรัน Web App Dev Server
 └── AGENTS.md                           # กฎและระเบียบสถาปัตยกรรมสำหรับ AI Agent
 ```
+
+---
+
+## สถาปัตยกรรม 2 โมเดลธุรกิจ (Dual Commercial Architecture)
+
+โครงการแบ่งโครงสร้างการให้บริการและจำหน่ายออกเป็น 2 ส่วนชัดเจนบนโฮสต์เดียวกัน:
+
+1. **ส่วนที่ 1: ส่วนที่เรารับดูแล (Platform SaaS Hub: `https://spk.p-services.net/`)**
+   - **กลุ่มเป้าหมาย:** ลูกค้าทั่วไปที่ต้องการให้เราดูแลเครื่องแม่ข่าย คลาวด์ และฐานข้อมูลให้
+   - **การทำงาน:**
+     - มีปุ่ม `[+ ลงทะเบียนร้านค้าใหม่]` (`/?page=register`) สำหรับเปิดร้านใหม่แยกฐานข้อมูลอัตโนมัติ
+     - มีส่วนจัดการร้านค้า (Management View), จอครัว (KDS), และระบบสั่งอาหารผ่าน QR
+     - มีศูนย์ติดตามเซสชัน (Active Sessions Monitor) และเครื่องมือวิศวกร (DEV Action Panel) สำหรับนักพัฒนาเข้าดูแลระบบผ่าน Dev Key
+
+2. **ส่วนที่ 2: ส่วนสำหรับขายเดี่ยวให้ลูกค้านำไปลง VPS เอง (Standalone Turnkey Edition: `https://spk.p-services.net/standalone`)**
+   - **กลุ่มเป้าหมาย:** ลูกค้าที่ต้องการซื้อขาดทั้งโปรเจกต์เพื่อนำไปติดตั้งบน VPS หรือ Server ส่วนตัวของตนเอง
+   - **การทำงาน:**
+     - ล็อกรหัสร้านค้าประจำระบบเป็น `RPOS-DEMO-0001` (ร้านอาหารรสเด็ด ชวนชิม) เป็น Single-Store Mode อัตโนมัติ
+     - **ระบบป้องกันเชิงพาณิชย์ (Commercial Protection Guards):**
+       - **ปิดระบบลงทะเบียนร้านค้าใหม่ 100%:** ไม่มีปุ่มลงทะเบียนใน UI/Header และบล็อก `POST /api/stores/register` ด้วย `403 Forbidden` ป้องกันไม่ให้ผู้ซื้อนำโค้ดไปเปิดแพลตฟอร์มรับสมัครร้านค้าแข่งกับเรา
+       - **ปิดตายเครื่องมือ DEV Panel 100%:** บล็อก `/api/dev/*` ด้วย `403 Forbidden`, ปิดคีย์ลัด `Ctrl+Alt+D`, และซ่อน Floating DEV Toolbar
+       - **ตัดคำศัพท์เทคนิคและไร้ปุ่มสลับระบบ 100%:** หน้าเว็บมีเฉพาะชื่อระบบ, ปุ่มสั่งอาหาร QR โต๊ะ, และปุ่มเข้าสู่ระบบแคชเชียร์ เสมือนเว็บไซต์ของร้านอาหารจริงๆ โดยไม่มีคำอย่าง `Standalone Turnkey Edition` หรือปุ่มสลับระบบกลับมายัง SaaS ของเรา
+     - **ระบบ Auto-Online Presence:** `PosPresenceTracker` ตั้งค่าสถานะออนไลน์จำลองให้อัตโนมัติสำหรับ `RPOS-DEMO-0001` เพื่อให้ผู้สนใจสามารถทดลองสั่งอาหารผ่านโต๊ะ T01-T12 ได้จริง 24 ชั่วโมง โดยไม่ต้องเปิดโปรแกรมแคชเชียร์ Windows ทิ้งไว้
 
 ---
 
@@ -111,7 +154,7 @@ res-pos_psoft/
   - เมื่อแคชเชียร์เช็คบิลปิดโต๊ะ (F10) ➔ จอลูกค้าแสดงสถานะเสร็จสิ้น, จอครัว (KDS) ตัดรายการออก, แดชบอร์ดสรุปยอดขายอัปเดตทันที
 
 ### 2. ระบบจัดการโต๊ะและการสั่งอาหารแบบต่อเนื่อง (Multi-Round Table Ordering)
-- **ปุ่มโต๊ะพร้อม Hover & Visual States:** ปุ่มโต๊ะ (T1-T8 + กลับบ้าน) มีเอฟเฟกต์ Hover เมื่อชี้เมาส์, ไฮไลต์สีน้ำเงินเข้มเมื่อเลือกโต๊ะนั้น (Selected State), และเปลี่ยนเป็นสีส้มอำพันเมื่อโต๊ะมีออเดอร์ค้างอยู่ (Occupied State)
+- **ปุ่มโต๊ะพร้อม Hover & Visual States:** ปุ่มโต๊ะ (T1-T12 + สั่งกลับบ้าน) มีเอฟเฟกต์ Hover เมื่อชี้เมาส์, ไฮไลต์สีน้ำเงินเข้มเมื่อเลือกโต๊ะนั้น (Selected State), และเปลี่ยนเป็นสีส้มอำพันเมื่อโต๊ะมีออเดอร์ค้างอยู่ (Occupied State)
 - **พาเนลแสดงรายการที่สั่งไปแล้วของแต่ละโต๊ะ (Existing Orders Panel):** แคชเชียร์สามารถกดเลือกโต๊ะเพื่อดูว่าโต๊ะนั้นสั่งอะไรไปแล้วบ้าง, จำนวนกี่รายการ, สถานะของแต่ละจาน, และยอดรวมสะสมของโต๊ะ
 - **สั่งอาหารเพิ่มเข้าโต๊ะเดิมโดยไม่เขียนทับ (No Overwriting):** รองรับการสั่งอาหารรอบที่ 2 หรือ 3 โดยระบบจะสร้างรอบใหม่ของโต๊ะนั้น และนำมารวมยอดสะสมให้อัตโนมัติ
 - **เช็คบิลรวมโต๊ะในคราวเดียว (Consolidated Payment F10):** สามารถชำระเงินและปิดบิลรวมทุกรอบของโต๊ะนั้นในครั้งเดียว
@@ -136,8 +179,8 @@ res-pos_psoft/
 
 ### 7. ระบบหลายสาขา/ร้านค้าแยกฐานข้อมูลเด็ดขาด (Database-per-Tenant Multi-Store)
 - **แยกฐานข้อมูลเป็นเอกเทศน์ 100% (Physical Database Isolation):** แต่ละร้านมีไฟล์ฐานข้อมูลของตนเอง (`tenants/{StoreCode}.db`) แยกขาดจาก Master Catalog (`tenants/master.db`) ข้อมูลไม่ปะปนกัน สำรองและกู้คืนข้อมูลเฉพาะร้านได้อิสระ
-- **ระบบสมัครเปิดร้านใหม่ (Store Registration):** รองรับการลงทะเบียนเปิดร้านใหม่ผ่าน Web App พร้อมสร้างฐานข้อมูลร้านและบัญชีผู้ดูแลร้านให้อัตโนมัติ
-- **การเชื่อมต่อผ่านรหัสร้าน (Store Code Binding):** เครื่องลูกข่าย Windows Desktop POS และ Web App ระบุ Server IP และรหัสร้านค้า (Store Code) พร้อมระบบตรวจสอบความถูกต้องก่อนเชื่อมต่อ และแยกห้อง Real-Time SignalR เฉพาะร้านค้า
+- **กฎเหล็กการ Deploy และ Reset ฐานข้อมูล:** การ Reset ฐานข้อมูลหรือรันสคริปต์ Deploy จะต้องคงฐานข้อมูล `DEFAULT.db` และ `RPOS-DEMO-0001.db` พร้อมคงรายการใน `master.db` เสมอ ห้ามลบข้อมูลประจำระบบทั้งสองร้านนี้เด็ดขาด
+- **ไม่แตะต้องบริการ PM2 อื่น:** เซิร์ฟเวอร์รันบริการอื่นของระบบ (`pcom-*`) อยู่ด้วย การ Deploy ห้ามหยุดหรือเปลี่ยนแปลงบริการ PM2 อื่นโดยเด็ดขาด
 
 ### 8. ระบบสร้างและพิมพ์ป้าย QR Code ประจำโต๊ะและสั่งกลับบ้าน (Table QR & Takeaway System)
 - **ป้าย QR ติดโต๊ะเฉพาะร้าน (Table QR Stickers):** ผูกรหัสร้านและเลขโต๊ะ (`?store=...&table=...`) ออเดอร์ส่งตรงเข้าโต๊ะนั้นๆ บน POS ทันที
@@ -232,6 +275,16 @@ res-pos_psoft/
 | **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 37)** (2026-10-08) | Clean Landing Page: Replace Inline Form with Core Modules & Quick Launch | 1) นำฟอร์มลงทะเบียนร้านค้ายาวเหยียดออกจากหน้าแรก (`SoftwareLandingView.tsx`) ให้หน้าหลักสะอาด สบายตา และมีระดับ, 2) เพิ่มส่วนนำเสนอโมดูลการทำงานและฟีเจอร์เด่นระดับองค์กร 6 โมดูลหลัก (Windows Desktop POS หน้าร้าน, สั่งอาหาร QR Code, จอครัว KDS เรียลไทม์, คลังวัตถุดิบ & สูตรอาหาร BOM, รายงานยอดขายและสำรองข้อมูล, สถาปัตยกรรมคลาวด์แยกฐานข้อมูล 100%), 3) เพิ่มแบนเนอร์ Quick Launch & Registration Banner พร้อมปุ่มเปิดหน้าต่างลงทะเบียนเฉพาะ (`window.open('/?page=register', '_blank')`), กล่อง Server API URL แบบคัดลอกได้ และคำแนะนำการใช้งานชัดเจน, 4) Deploy ขึ้น Production Linux Server (`https://spk.p-services.net/`) สำเร็จ 100% พร้อมทดสอบ Health Check และ Asset Bundle สมบูรณ์ | ผ่านการทดสอบและ Deploy สำเร็จ (Production 100% OK) |
 | **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 38)** (2026-10-08) | Strict Separation of Table Reservation & Food Ordering with Live Visual Sync | 1) แยกโมดูล "การจองโต๊ะ (Table Reservation)" กับ "การสั่งอาหาร (Food Ordering)" ออกจากกัน 100% ทั้งบน Web App และ Windows Desktop POS, 2) ปรับการแสดงผลสีสถานะโต๊ะตามมาตรฐานอย่างเคร่งครัด: สีเหลือง = โต๊ะจองแล้ว (Reserved), สีแดง = โต๊ะทำงานอยู่/มีลูกค้า/มีออเดอร์ค้าง (Occupied), สีปกติ/ขาว = โต๊ะว่าง (Available) ทั้งบนปุ่มด่วน Quick Tables, ผังโต๊ะ และหน้าต่างจัดการโต๊ะ, 3) ซิงค์ข้อมูล Real-Time ข้ามระบบผ่าน SignalR TableStatusChanged สอดคล้องกันทั้ง Server Hub, Windows Desktop POS และ Web App, 4) ระบบจัดการจองโต๊ะพร้อมปุ่มเช็คอินเข้าโต๊ะเพื่อเริ่มสั่งอาหาร และปุ่มยกเลิกการจองคืนสถานะโต๊ะว่าง, 5) ระบบย้าย Schema อัตโนมัติ (Automated Database Migration) และ Thread-Safe Synchronization ผ่านการทดสอบชุดทดสอบอัตโนมัติครบถ้วน 100% | ผ่านการทดสอบ (27/27 Tests Passed, Master Solution Build OK, Web Build OK) |
 | **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 39)** (2026-10-08) | Full Production Deployment & Package Release | 1) คอมไพล์และบิลด์ Web SPA ชุดล่าสุดพร้อมระบบแยกการจองโต๊ะและสั่งอาหารเด็ดขาด และโมดูลจัดการโต๊ะสด, 2) เผยแพร่ ASP.NET Core Central Server ตัวเต็ม (.NET 10 linux-x64 self-contained), 3) Deploy ขึ้น Production Linux Server (`192.168.1.247` ผ่านโดเมน `https://spk.p-services.net/`) สำเร็จ 100%, 4) ตรวจสอบ Service `restaurantpos.service` (Active Running), Health Check (200 OK), API Tables พร้อม Schema การจองโต๊ะ และคงสถานะบริการ PM2 อื่นๆ ของระบบ pcom ทำงานปกติ 100%, 5) อัปเดตและคอมไพล์ชุด Release ของ Windows Desktop POS (`Psoft-RES Online.exe`) บันทึกลง `build_output` และ `RestaurantPOS_Package_v1.0` บน Desktop เรียบร้อย | ผ่านการทดสอบและ Deploy สำเร็จ (Production 100% OK & 23/23 Audit Tests Passed) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 40)** (2026-10-09) | Header Spacing, 3-Step Order Status, Real-Time Sales Sync & Production Deployment | 1) ปรับลดช่องว่าง (Padding) ส่วนหัวบนสุดของหน้าเว็บให้กระชับ สมดุลสายตา ไม่เหลือพื้นที่เพดานรูปภาพโล่งเกินไป, 2) ปรับลดขั้นตอนสถานะออเดอร์ให้เหลือเพียง 3 ขั้นตอน [รับออเดอร์] &gt; [รอเสิร์ฟ] &gt; [เสิร์ฟแล้ว] ทั้งบน Server, Web (KDS/Customer Tracking) และ Client Windows POS (ตัวกรองแท็บ, ปุ่มดำเนินการในตาราง, และหน้าต่าง Order Details), 3) อัปเกรดหน้าสรุปยอดขาย (Sales Dashboard) ทั้งบน Web และ Desktop POS ให้ซิงค์สดแบบ Real-Time เมื่อมีการปิดบิล/สั่งอาหารใหม่ พร้อมแบดจ์แสดงสถานะซิงค์สดและเวลาอัปเดตล่าสุด, 4) Deploy ขึ้น Production Linux Server (`192.168.1.247` ผ่านโดเมน `https://spk.p-services.net/`) สำเร็จ 100%, 5) อัปเดตและคอมไพล์ชุด Release ของ Windows Desktop POS (`Psoft-RES Online.exe`) บันทึกลง `build_output` และ `RestaurantPOS_Package_v1.0` บน Desktop เรียบร้อย | ผ่านการทดสอบและ Deploy สำเร็จ (Production 100% OK, 23/23 Audit Passed, 27/27 Tests Passed) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 41)** (2026-10-09) | RPOS Code Standard, Dual Architecture (Platform vs Standalone Turnkey), Live Sessions Monitor & DEV Action Panel | 1) ปรับมาตรฐานรหัสร้านค้าให้เหลือเฉพาะ RPOS Code รูปแบบเดียว (`RPOS-XXXX-XXXX`) ตัดคำว่า Shop Code และรหัส SHOP ทิ้งทั้งระบบเพื่อซิงค์ตรงกับ C# WPF POS, 2) ออกแบบสถาปัตยกรรม 2 โหมด: โหมด 1 Managed Cloud Server (Multi-Tenant SaaS) และ โหมด 2 Standalone Turnkey Platform สำหรับขายโปรเจกต์ (ล็อคเฉพาะร้านค้า ปิดระบบรับสมัครร้านใหม่ เพื่อไม่ให้นำไปเปิดแพลตฟอร์มต่อ), 3) เพิ่มหน้าดูใครกำลังใช้งาน (Live Active Sessions Monitor) แสดงรายชื่ออุปกรณ์, WPF POS, Web, IP, เวลาเชื่อมต่อ, และปุ่มเตะเซสชัน (Kick Session), 4) เพิ่ม DEV Action Panel สำหรับวิศวกร ควบคุมคำสั่ง Force Sync ทุกจุดขาย, ปิงทดสอบระบบ, ล้างแคช และดูขนาดฐานข้อมูลรายสาขา (Tenants DB Inspector), 5) อัปเดตการซิงค์ข้ามไคลเอนต์ผ่าน SignalR Room Switching และเชื่อมต่อ ForceSync เข้ากับหน้าสรุปยอดขาย, เมนู, สต๊อก และ KDS | ผ่านการทดสอบ (27/27 Tests Passed, Web Build OK, Master Solution Build OK) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 42)** (2026-10-09) | Production Database Reset, Desktop Release Package & Web Hub Deployment | 1) รีเซ็ตฐานข้อมูลบน Production Linux Server ให้สะอาดหมดจด ลบฐานข้อมูลร้านทดสอบทั้งหมด พร้อมทั้งคืนค่าร้านตัวอย่าง `DEFAULT` ให้พร้อมสำหรับนำเสนอลูกค้า (คงรายการอาหาร 13 รายการพร้อมรูปภาพความละเอียดสูง หมวดหมู่ และรีเซ็ตสถานะโต๊ะทั้ง 12 โต๊ะเป็น [ว่าง] ยอดบิลเป็นศูนย์), 2) คอมไพล์โปรแกรม Windows Desktop POS ตัวเต็มใน Release Mode (`Psoft-RES Online.exe` ขนาด 304 KB วันที่ 10/9/2026) พร้อมโปรแกรม KeyGen ลงในแพ็กเกจสมบูรณ์ `RestaurantPOS_Package_v1.0` บน Desktop (`C:\Users\admin\Desktop`) และสร้างสคริปต์รันด่วน `Run_Psoft-RES.bat`, 3) เผยแพร่และ Deploy Web Hub (ASP.NET Core Server + React SPA บันเดิลใหม่) ขึ้น Production Server (`192.168.1.247` ผ่านโดเมน `https://spk.p-services.net/`) สำเร็จ 100%, 4) ตรวจสอบ Service `restaurantpos.service` ทำงานปกติ (Active Running บนพอร์ต 3000), Health Check (200 OK), ตรวจสอบโหมดระบบ (`Platform`), โดยระบบ PM2 เดิม (`pcom-*`) ยังคงออนไลน์ปกติทุกบริการ | ผ่านการทดสอบและ Deploy สำเร็จ (Production 100% OK) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 43)** (2026-10-09) | Dedicated Standalone Turnkey Deployment & Complete DEV Panel Isolation | 1) ออกแบบและ Deploy อินสแตนซ์แยกเฉพาะสำหรับโมเดลขายยกแพ็คเกจ (Standalone Turnkey Edition สำหรับลูกค้าร้านเดี่ยว) บน Linux Server พอร์ต 3005 (`http://192.168.1.247:3005/`) พร้อม Service `restaurantpos_standalone.service` (Active Running), 2) ตัดและปิดตาย DEV Panel 100% สำหรับโหมดขายยกแพ็คเกจ: ซ่อน DEV Action Panel, ซ่อน Floating DEV Toolbar, ปิดคีย์ลัด Ctrl+Alt+D และ Easter Egg, บล็อกทุก API Endpoint ของ DevController ด้วย 403 Forbidden, 3) ปิดระบบรับสมัครร้านค้าใหม่ 100%: ปิดปุ่มลงทะเบียนใน UI ทั้งหมด และบล็อก `/api/stores/register` ด้วย 403 Forbidden, 4) ออกแบบหน้าเว็บ Single-Store Portal แสดงรหัสร้านค้าประจำระบบ (`RPOS-DEMO-0001`), ปุ่มเข้าสั่งอาหาร/ดูเมนู QR, ปุ่มเข้าสู่ระบบแคชเชียร์/จัดการร้านแบบล็อกรหัสร้านค้าอัตโนมัติ, 5) ติดตั้งฐานข้อมูลร้านค้าประจำระบบพร้อมรายการอาหาร 13 รายการ รูปภาพความละเอียดสูง 12 โต๊ะอาหาร, 6) อัปเดตชุดโปรแกรม C# Desktop Release บน Desktop ให้รองรับระบบทั้งสองโหมด | ผ่านการทดสอบ (27/27 Tests Passed, Master Solution Build OK, Web Build OK, Production Verified 100%) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 44)** (2026-10-09) | Full Client/Server DEV Panel Elimination for Standalone Package & Production Update | 1) เชื่อมต่อ State `platformMode` ในระดับ Root Application (`App.tsx`) ตรวจจับโหมดเซิร์ฟเวอร์แบบ Real-Time จาก API `/api/stores/mode`, 2) ปิดตาย DEV Panel และเครื่องมือนักพัฒนาทั้งหมดบน Standalone Turnkey Edition (พอร์ต 3005): ปิดปุ่มสลับ DEV Toolbar, ปิดคีย์ลัด `Ctrl+Alt+D` / `Ctrl+Shift+D`, ปิดการคลิก Easter Egg, บล็อกพารามิเตอร์ `?dev=1`, และบล็อก DEV API ด้วย HTTP 403 Forbidden เสมอ, 3) ผูก DEV Action Panel เข้าสู่แท็บระบบจัดการร้านหลังบ้าน (ManagementView) เฉพาะบน Master Platform Hub (พอร์ต 3000) สำหรับทีมวิศวกรดูแลระบบ, 4) ล็อกรหัสร้านค้าสำหรับโมเดลขายยกแพ็คเกจเป็น `RPOS-DEMO-0001` (Single-Store Model) แบบ ReadOnly อัตโนมัติ ซ่อนปุ่ม [ใช้ DEFAULT] และซ่อนปุ่มสลับร้านค้าในแถบนำทาง, 5) ทำการ Build และ Deploy อัปเดตทั้ง Master Hub (`https://spk.p-services.net/`) และ Standalone Instance (`http://192.168.1.247:3005/`) สำเร็จ 100% พร้อมคงสถานะบริการ PM2 ทั้ง 5 บริการออนไลน์ตามปกติ | ผ่านการทดสอบ (27/27 Tests Passed, Web Build OK, Production Verified 100%) |
+| **เวอร์ชัน 1.0 (แก้ไขครั้งที่ 45)** (2026-10-09) | Dual Commercial Routing & Production Deployment (`https://spk.p-services.net/standalone`) | 1) เปิดให้บริการลิงก์ตรง `https://spk.p-services.net/standalone` ใช้งานได้จริงบน Production 100% ผ่าน Cloudflare Tunnel, 2) แยกสถาปัตยกรรมเชิงพาณิชย์ 2 ส่วนเด็ดขาด: ส่วนเรารับดูแล (Platform SaaS Hub: `https://spk.p-services.net/`) มีปุ่มลงทะเบียนเปิดร้านใหม่และเครื่องมือดูแลระบบ vs ส่วนขายเดี่ยวลง VPS เอง (Standalone Turnkey Edition: `https://spk.p-services.net/standalone`) ล็อกตรงเข้าสู่ร้านค้าเดี่ยว `RPOS-DEMO-0001` ปิดรับสมัครร้านใหม่ 100% (บล็อก 403 Forbidden ป้องกันลูกค้านำไปเปิดแพลตฟอร์มต่อ) และบล็อก DEV Panel/API 100%, 3) เพิ่มระบบ Auto-Online Presence สำหรับ Demo Store ใน `PosPresenceTracker` ให้ผู้สนใจสามารถทดลองสั่งอาหารผ่านโต๊ะ T01-T12 ได้จริงตลอด 24 ชั่วโมง, 4) ทดสอบ End-to-End สั่งอาหารจริง (201 Created), ปรับสถานะโต๊ะอัตโนมัติ, พร้อมรีเซ็ตสถานะโต๊ะ [ว่าง] พร้อมใช้งาน, 5) บริการ PM2 อื่นๆ ของระบบ (`pcom-*`) บนเซิร์ฟเวอร์ยังคงออนไลน์และปลอดภัย 100% | ผ่านการทดสอบและ Deploy สำเร็จ (Production 100% OK, 27/27 Tests Passed, Browser Verified 100%) |
+
+
+
+
 
 
 
